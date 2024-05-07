@@ -4,7 +4,7 @@ from langchain_community.utilities import SQLDatabase
 from langchain.llms.openai import OpenAI 
 from langchain.agents import AgentExecutor 
 from langchain.agents.agent_types import AgentType
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_groq import ChatGroq
 from langchain_anthropic import ChatAnthropic
 from urllib.parse import quote_plus
@@ -35,7 +35,10 @@ def run_test_query(project_id: str, query: str, model: str = "claude-3-sonnet-20
         if "claude" in model:
             llm = ChatAnthropic(temperature=0, model_name=model)
         elif "gpt" in model:
-            llm = ChatOpenAI(model=model, temperature=0)
+            llm = AzureChatOpenAI(
+                azure_deployment=os.environ['AZURE_OPENAI_MODEL_NAME'],
+                openai_api_version=os.environ['AZURE_OPENAI_API_VERSION']
+            )
         elif "llama" in model:
             llm = ChatGroq(model=model, temperature=0)
         elif "mixtral" in model:

@@ -4,7 +4,7 @@ from langchain_community.utilities import SQLDatabase
 from langchain.llms.openai import OpenAI 
 from langchain.agents import AgentExecutor 
 from langchain.agents.agent_types import AgentType
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_groq import ChatGroq
 from langchain_anthropic import ChatAnthropic
 from urllib.parse import quote_plus
@@ -13,7 +13,10 @@ from threading import Lock
 
 from config import Config
 
-llm = ChatAnthropic(temperature=0, model_name="claude-3-sonnet-20240229")
+llm = AzureChatOpenAI(
+    azure_deployment=os.environ['AZURE_OPENAI_MODEL_NAME'],
+    openai_api_version=os.environ['AZURE_OPENAI_API_VERSION']
+)
 
 # Global cache for database connections and a lock for thread-safe operations
 # TODO : Test the concurrency of agent_executor.  If it is not thread-safe, we need to create a new agent_executor for each thread.
