@@ -1,10 +1,12 @@
 # import uvicorn
 from fastapi import FastAPI
 import routes.csv.csv_router as csv_router
+import routes.docs.docs_router as docs_router
 
 app = FastAPI()
 
 app.include_router(csv_router.router)
+app.include_router(docs_router.router)
 
 @app.get('/')
 async def root():

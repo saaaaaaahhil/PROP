@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from fastapi import UploadFile, File, Form
+from fastapi import BackgroundTasks
 from fastapi.responses import JSONResponse
 import asyncio
 from starlette.concurrency import run_in_threadpool
@@ -32,6 +33,7 @@ async def read_xlsx_async(contents):
 
 @router.post('/upload_data')
 async def upload_data(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     project_id: str = Form(...)):
 
@@ -52,16 +54,12 @@ async def upload_data(
                 df = await read_xlsx_async(contents)
 
             df.columns = [c.lower().replace(' ', '_') for c in df.columns]
-            print(df.head())
 
             # remove extension from filename, make lowercase, and replace spaces with underscores
             file_name = file.filename.split('.')[0].lower().replace(' ', '_')
 
-            response = await run_in_threadpool(upload_to_sql, project_id, df, file_name)
-            if response:
-                return JSONResponse(status_code=200, content={"message": f'File {file.filename} uploaded successfully to {project_id} database.'})
-            else:
-                return JSONResponse(status_code=500, content={"message": f'Error uploading file {file.filename} to {project_id} database.'})
+            background_tasks.add_task(upload_to_sql, project_id, df, file_name)
+            return JSONResponse(status_code=200, content={"message": f'File {file.filename} uploaded successfully to {project_id} database.'})
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": f'Error uploading file {file.filename} to {project_id} database: {e}'})
 
