@@ -14,7 +14,7 @@ from threading import Lock
 from config import Config
 
 llm = AzureChatOpenAI(
-    azure_deployment=os.environ['AZURE_OPENAI_MODEL_NAME'],
+    azure_deployment=os.environ['AZURE_OPENAI_CHAT_DEPLOYMENT_NAME'],
     openai_api_version=os.environ['AZURE_OPENAI_API_VERSION']
 )
 
@@ -61,7 +61,7 @@ def get_agent_executor(project_id: str):
                     llm=llm,
                     toolkit=toolkit,
                     verbose=True,
-                    suffix="I should look at the tables in the database to see what I can query.  Then I should query the schema of the most relevant tables and join wherever needed. I should not limit the number of results.",
+                    suffix=os.environ['SQL_AGENT_PROMPT_SUFFIX'],
                     # agent_type="tool-calling",
                     agent_type="zero-shot-react-description",
                     agent_executor_kwargs={

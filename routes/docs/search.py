@@ -1,7 +1,7 @@
 from azure.search.documents.models import VectorizedQuery
 from langchain_groq import ChatGroq
 from langchain_anthropic import ChatAnthropic
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 
 import numpy as np
@@ -12,7 +12,11 @@ from routes.docs.embeddings import get_embeddings
 from routes.docs.index_search_client import get_index_client
 
 # llm = ChatGroq(model="llama3-70b-8192", temperature=0)
-llm = ChatOpenAI(temperature=0, model_name="gpt-4-turbo-preview")
+# llm = ChatOpenAI(temperature=0, model_name="gpt-4-turbo-preview")
+llm = AzureChatOpenAI(
+    azure_deployment=os.environ['AZURE_OPENAI_CHAT_DEPLOYMENT_NAME'],
+    openai_api_version=os.environ['AZURE_OPENAI_API_VERSION']
+)
 
 def get_top_k_results(project_id, query):
     """

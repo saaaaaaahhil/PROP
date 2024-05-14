@@ -1,7 +1,6 @@
 import os
 
 class Config:
-    # CSV
     POSTGRES_USER = os.environ['POSTGRES_USER']
     POSTGRES_PASSWORD = os.environ['POSTGRES_PASSWORD']
     POSTGRES_DEFAULT_DB = os.environ['POSTGRES_DEFAULT_DB']
@@ -20,3 +19,7 @@ class Config:
 
     TOP_K = int(os.environ['TOP_K'])
     RAG_SYSTEM_PROMPT = os.environ['RAG_SYSTEM_PROMPT']
+
+    # Azure Blob Storage
+    AZURE_BLOB_STORAGE_CONN_STR = os.environ['AZURE_BLOB_STORAGE_CONN_STR']
+    AZURE_BLOB_STORAGE_BASE_URL = os.environ['AZURE_BLOB_STORAGE_BASE_URL']
