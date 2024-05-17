@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class Config:
     POSTGRES_USER = os.environ['POSTGRES_USER']
@@ -23,3 +26,8 @@ class Config:
     # Azure Blob Storage
     AZURE_BLOB_STORAGE_CONN_STR = os.environ['AZURE_BLOB_STORAGE_CONN_STR']
     AZURE_BLOB_STORAGE_BASE_URL = os.environ['AZURE_BLOB_STORAGE_BASE_URL']
+
+    # MongoDB
+    MONGO_DB_URI = os.environ['MONGO_DB_URI']
+    MONGO_DB_DATABASE = os.environ['MONGO_DB_DATABASE']
+    MONGO_DB_COLLECTION = os.environ['MONGO_DB_COLLECTION']

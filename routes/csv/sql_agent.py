@@ -18,6 +18,7 @@ llm = AzureChatOpenAI(
     openai_api_version=os.environ['AZURE_OPENAI_API_VERSION']
 )
 
+
 # Global cache for database connections and a lock for thread-safe operations
 # TODO : Test the concurrency of agent_executor.  If it is not thread-safe, we need to create a new agent_executor for each thread.
 agent_cache = {}
@@ -83,7 +84,7 @@ def run_query(project_id: str, query: str):
     try:
         agent_executor = get_agent_executor(project_id)
         result = agent_executor.invoke(query)
-        return result['output']
+        return {"success": True, "answer" : result['output']}
     except Exception as e:
         print(f"Error running query: {e}")
         raise

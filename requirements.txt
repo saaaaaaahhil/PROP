@@ -19,3 +19,6 @@ numpy
 azure-storage-blob
 PyPDF2
 openai
+flower
+celery[redis]
+pymongo

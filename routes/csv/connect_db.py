@@ -38,7 +38,7 @@ def get_engine(db_name):
 
         # PostgreSQL connection string
         connection_str = f'postgresql://{db_username}:{encoded_password}@{db_host}:{db_port}/{db_name}'
-        engine = create_engine(connection_str)
+        engine = create_engine(connection_str, pool_pre_ping=True)
         engines[db_name] = engine
         return engine
 
