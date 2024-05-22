@@ -15,35 +15,23 @@ from config import Config
 
 router = APIRouter(prefix='/images', tags=['IMAGES'])
 
-@router.post('/upload_image')
 async def upload_image(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    project_id: str = Form(...)):
+    file: UploadFile,
+    project_id: str,
+    id: str):
 
-    id  = str(uuid.uuid4())
     db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
     try:
         if file.content_type not in ['image/jpeg', 'image/png']:
             return JSONResponse(status_code=400, content={"message": f'File format for {file.filename} not supported, please upload a JPEG or PNG image.'})
         print(f'Uploading file {file.filename} to {project_id} index.')
 
-        collection = db[str(Config.MONGO_DB_COLLECTION)]
-        check = collection.find_one({'file_name': file.filename})
-        if check is not None:
-            if check['status'] == 'success':
-                print("File already exists in database !")
-                return JSONResponse(status_code=400, content={"message": f'File {file.filename} already exists in database.'})
-            else:
-                id = check['_id']
 
         file_type = file.content_type
         file_name = file.filename
         contents = await file.read()
 
-        query = {"_id": id}
-        update = {"$set": {'file_name': file.filename,'project_id': project_id, 'file_type': file_type, 'chunks' : [], 'status' : 'in_progress'}}
-        collection.update_one(query, update, upsert=True)
 
         background_tasks.add_task(upload_image_to_store, project_id, contents, file_name, file_type)
         return JSONResponse(status_code=200, content={"message": f'File uploaded successfully.'})
@@ -54,7 +42,6 @@ async def upload_image(
         update = {"$set": {"status": "fail"}}
         collection.update_one(query,update,upsert=True)
         return JSONResponse(status_code=500, content={"message": f'Error uploading file.'})
-        raise
     
 @router.post('/run_image_query')
 async def run_image_query(
@@ -74,20 +61,14 @@ async def run_image_query(
         raise
         return JSONResponse(status_code=500, content={"message": f'Error running query.'})
     
-@router.post('/delete_image')
 async def delete_image(
     background_tasks: BackgroundTasks,
-    project_id: str = Form(...),
-    file_id: str = Form(...)):
+    project_id: str,
+    file_id: str):
     
     db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
     try:
         print(f'Deleting file {file_id} from {project_id} database.')
-
-        collection = db[str(Config.MONGO_DB_COLLECTION)]
-        query = {'_id': file_id}
-        update = {"$set" : {'status': 'deleting'}}
-        collection.update_one(query, update)
 
         background_tasks.add_task(delete_image_data, project_id, file_id)
 
@@ -98,6 +79,6 @@ async def delete_image(
         query = {'_id': file_id}
         update = {"$set" : {'status': 'success'}}
         collection.update_one(query, update)
-        return JSONResponse(status_code=500, content={"message": f'Error uploading file.'})
+        return JSONResponse(status_code=500, content={"message": f'Error deleting file.'})
         
     

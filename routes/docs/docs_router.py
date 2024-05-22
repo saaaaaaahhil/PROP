@@ -18,13 +18,12 @@ from connections.mongo_db import mongodb_client
 
 router = APIRouter(prefix='/doc', tags=['DOC'])
 
-@router.post('/upload_doc')
 async def upload_doc(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    project_id: str = Form(...)):
+    file: UploadFile,
+    project_id: str,
+    id: str):
 
-    id  = str(uuid.uuid4())
     try:
         if file.content_type != 'application/pdf':
             return JSONResponse(status_code=400, content={"message": f'File format for {file.filename} not supported, please upload a PDF file.'})
@@ -35,20 +34,6 @@ async def upload_doc(
         file_name = file.filename
         contents = await file.read()
 
-        db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
-        collection = db[str(Config.MONGO_DB_COLLECTION)]
-
-        check = collection.find_one({'file_name': file_name})
-        if check is not None:
-            if check['status'] == 'success':
-                print("File already exists in database !")
-                return JSONResponse(status_code=400, content={"message": f'File {file.filename} already exists in database.'})
-            else:
-                id = check['_id']
-
-        query = {"_id": id}
-        update = {"$set": {'file_name': file_name,'project_id': project_id, 'file_type': file_type, 'chunks' : [], 'status' : 'in_progress'}}
-        collection.update_one(query, update, upsert=True)
 
         background_tasks.add_task(upload_document_to_index, project_id, contents, file_name, file_type)
         return JSONResponse(status_code=200, content={"message": f'File uploaded successfully.'})
@@ -60,7 +45,7 @@ async def upload_doc(
         update = {"$set": {"status": "fail"}}
         collection.update_one(query,update,upsert=True)
         return JSONResponse(status_code=500, content={"message": f'Error uploading file.'})
-        raise
+        
     
 @router.post('/run_doc_query')
 async def run_doc_query(
@@ -81,26 +66,20 @@ async def run_doc_query(
         raise
     
 
-@router.post('/delete_doc')
 async def delete_doc(
     background_tasks: BackgroundTasks,
-    project_id: str = Form(...),
-    file_id: str = Form(...)):
+    project_id: str,
+    file_id: str):
 
-    db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
     try:
         print(f'Deleting file {file_id} from {project_id} database.')
-
-        collection = db[str(Config.MONGO_DB_COLLECTION)]
-        query = {'_id': file_id}
-        update = {"$set" : {'status': 'deleting'}}
-        collection.update_one(query, update)
 
         background_tasks.add_task(delete_doc_data, project_id, file_id)
         
         return JSONResponse(status_code=200, content={"message": f'File deleted successfully.'})
     except Exception as e:
         print(f"Error deleting file: {e}")
+        db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
         collection = db[str(Config.MONGO_DB_COLLECTION)]
         query = {'_id': file_id}
         update = {"$set" : {'status': 'success'}}

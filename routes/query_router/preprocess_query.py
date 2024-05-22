@@ -42,9 +42,13 @@ system_prompt = "Analyze the given query and classify it into one of the followi
     1. Can you show me the floor plan of the 2 bed unit? \
     2. Can you show me the master plan? \
     3. Can you show me the site map? \
+  - 'general' if query is related to rules and regulations, taxes and other standard operating procedures  \
+    Some example queries: \
+    1. What is the capital gains tax treatment for non-resident purchasers from Dubai? How are my rentals taxed?\
+    2. Broker A shared the lead of international customer Peter on 3rd Dec. Later broker B shared the same lead but with the customer in email loop on 10th Dec. Whom should the lead credit go to? (SOP's regarding sales)\
   - 'other' if the query does not fall into either of the previous categories. \
   If the input from user contains more than one query(i.e. composite query), separate and process each query independently. For example: What is the price of unit 123 in the given project and what are the nearby hospitals from the project?\
-  Respond with a list of JSON objects in the following format: { 'result': [{query:<atomic-query>,\n'category': 'vision' | 'csv' | 'return_image' | 'metadata' | 'other' },....]}. \
+  Respond with a list of JSON objects in the following format: { 'result': [{query:<atomic-query>,\n'category': 'vision' | 'csv' | 'return_image' | 'metadata' | 'general | 'other' },....]}. \
   The list will contain multiple json objects each one of them will have the atomic query and its category \
   Do not provide any explanation or additional information in your response."
 

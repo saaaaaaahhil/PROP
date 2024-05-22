@@ -56,7 +56,7 @@ def delete_data_sql(project_id: str, file_id: str):
     try:
         print(f'Deleting file from {project_id} database.')
     
-        collection = db.files
+        collection = db[str(Config.MONGO_DB_COLLECTION)]
         
         #Get filename from metadata
         file_name = collection.find_one({'_id': file_id},{'file_name': 1})

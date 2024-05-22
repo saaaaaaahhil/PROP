@@ -25,7 +25,8 @@ async def run_user_query(
             'csv': run_query,
             'metadata': run_md_query,
             'other': run_rag_pipeline,
-            'vision': query_images
+            'vision': query_images,
+            'general' : run_rag_pipeline
         }
 
         for result in response:

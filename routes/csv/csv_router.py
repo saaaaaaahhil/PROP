@@ -21,6 +21,7 @@ router = APIRouter(prefix='/csv', tags=['CSV'])
 global_lock = asyncio.Lock()
 upload_project_locks = {}
 
+
 async def get_project_lock(project_id):
     async with global_lock:
         if project_id not in upload_project_locks:
@@ -35,64 +36,43 @@ async def read_xlsx_async(contents):
     # Running blocking I/O in an executor
     return await run_in_threadpool(pd.read_excel, BytesIO(contents))
 
-@router.post('/upload_data')
+
 async def upload_data(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    project_id: str = Form(...)):
-
-    id  = str(uuid.uuid4())
+    file: UploadFile,
+    project_id: str,
+    id: str):
     try:
         project_lock = await get_project_lock(project_id)
         async with project_lock:
             print(f'Uploading file {file.filename} to {project_id} database.')
-            if not(file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+            if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
                 return JSONResponse(status_code=400, content={"message": f'File format for {file.filename} not supported, please upload a CSV or XLSX file.'})
 
-            db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
-            collection = db[str(Config.MONGO_DB_COLLECTION)]
-
-            check = collection.find_one({'file_name': file.filename})
-            if check is not None:
-                if check['status'] == 'success':
-                    print("File already exists in database !")
-                    return JSONResponse(status_code=400, content={"message": f'File {file.filename} already exists in database.'})
-                else:
-                    id = check['_id']
-            
-            if file.filename.endswith('.csv'):
-                file_type = 'csv'
-            else:
-                file_type = 'xlsx'
-
-            query = {"_id": id}
-            update = {"$set": {'file_name': file.filename,'project_id': project_id, 'file_type': file_type, 'chunks' : [], 'status' : 'in_progress'}}
-            collection.update_one(query, update, upsert=True)
-  
             contents = await file.read()
-            # Check the file extension to determine the format
+
+
             if file.filename.endswith('.csv'):
-                # Convert CSV string to DataFrame for preview/processing
                 df = await read_csv_async(contents)
             else:
-                # Use pandas to read the XLSX file from bytes
                 df = await read_xlsx_async(contents)
 
             df.columns = [c.lower().replace(' ', '_') for c in df.columns]
 
-            # remove extension from filename, make lowercase, and replace spaces with underscores
             file_name = file.filename.split('.')[0].lower().replace(' ', '_')
             print(df.head())
-            
+
             background_tasks.add_task(upload_to_sql, project_id, df, file_name, file.filename)
+            print("Task added to background tasks.")
         
             return JSONResponse(status_code=200, content={"message": f'File {file.filename} uploaded successfully to {project_id} database.'})
     except Exception as e:
+        print(f"Exception occurred: {e}")
         db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
         collection = db[str(Config.MONGO_DB_COLLECTION)]
         query = {'_id': id}
         update = {"$set": {"status": "fail"}}
-        collection.update_one(query,update,upsert=True)
+        await collection.update_one(query, update, upsert=True)
         return JSONResponse(status_code=500, content={"message": f'Error uploading file {file.filename} to {project_id} database: {e}'})
 
 
@@ -133,24 +113,16 @@ async def run_sql_query(
         return JSONResponse(status_code=500, content={"message": f'Error running query {query} on {project_id} database: {e}'})
 
 
-@router.post('/delete_data')
 async def delete_data(
     background_tasks: BackgroundTasks,
-    project_id: str = Form(...),
-    file_id: str = Form(...)):
+    project_id: str,
+    file_id: str):
 
     try:
         project_lock = await get_project_lock(project_id)
         async with project_lock:
             print(f'Deleting file {file_id} from {project_id} database.')
             
-            db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
-            collection = db[str(Config.MONGO_DB_COLLECTION)]
-            query = {'_id': file_id}
-            update = {"$set" : {'status': 'deleting'}}
-            collection.update_one(query, update)
-
-
             background_tasks.add_task(delete_data_sql, project_id, file_id)
 
             return JSONResponse(status_code=200, content={"message": f'File {file_id} deleted successfully from {project_id} database.', "result": True})
