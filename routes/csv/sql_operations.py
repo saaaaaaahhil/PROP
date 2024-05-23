@@ -1,34 +1,22 @@
 from routes.csv.connect_db import get_or_create_database
 import pandas as pd
-from connections.mongo_db import mongodb_client
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import MetaData
-from config import Config
+import logging
+from routes.mongo_db_functions import update_mongo_file_status, get_file, delete_file_from_mongo
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-def update_mongo_upload_status(db, original_filename, status):
-    collection = db[str(Config.MONGO_DB_COLLECTION)]
-    query = {'file_name': original_filename}
-    update = {"$set": {"status": status}}
-    collection.update_one(query, update)
-    return True
-
-
-def update_mongo_delete_status(db, file_id, status):
-    collection = db[str(Config.MONGO_DB_COLLECTION)]
-    query = {'_id': file_id}
-    update = {"$set": {"status": status}}
-    collection.update_one(query, update)
-    return True
-
-
-def upload_to_sql(project_id: str, df: pd.DataFrame, filename: str, original_filename: str):
+def upload_to_sql(project_id: str, df: pd.DataFrame, filename: str, original_filename: str, file_size: float):
     """
     This function takes a DataFrame and uploads it to a SQL database.
     """
-    db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
+    file_uploaded_to_storage = False 
     try:
-        print(f"Uploading DataFrame to SQL database {project_id}...")
+        logger.info(f"Uploading DataFrame to SQL database {project_id}...")
         
         # Get the database engine
         engine = get_or_create_database(project_id)
@@ -36,36 +24,36 @@ def upload_to_sql(project_id: str, df: pd.DataFrame, filename: str, original_fil
         # Upload the DataFrame to the database
         df.to_sql(filename, engine, if_exists='replace', index=False)
         
-        # Update the uploaded file's details in files metadata
-        update_mongo_upload_status(db, original_filename, 'success')
+        file_uploaded_to_storage = True 
 
-        print("File Uploaded successfully")
+        # Update the uploaded file's details in files metadata
+        update_mongo_file_status({'file_name': original_filename, 'project_id': project_id},{'$set': {'file_size': f'{round(file_size,1)} KB', 'status': 'success'}})
+
+        logger.info("File Uploaded successfully")
         return True
     
     except Exception as e:
-        update_mongo_upload_status(db, original_filename, 'fail')
-        print(f"Error uploading DataFrame to SQL: {e}")
+        logger.info(f"Error uploading DataFrame to SQL: {e}")
+        # Update the uploaded file's details in files metadata
+        if file_uploaded_to_storage == False:
+            update_mongo_file_status({'file_name': original_filename, 'project_id': project_id}, {'$set': {'status': 'fail'}})
         raise
-
 
 def delete_data_sql(project_id: str, file_id: str):
     """
     This function takes a project_id and file_id and deletes file from database.
     """
-    db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
     try:
-        print(f'Deleting file from {project_id} database.')
+        logger.info(f'Deleting file from {project_id} database.')
     
-        collection = db[str(Config.MONGO_DB_COLLECTION)]
-        
-        #Get filename from metadata
-        file_name = collection.find_one({'_id': file_id},{'file_name': 1})
-        if file_name is None:
+        # Check if file_id and project_id are valid
+        file = get_file(file_id, project_id)
+        if file is None:
             return {"success": False, "answer": "File Not Found !"}
         
-        table_name = file_name['file_name'].split('.')[0].lower().replace(' ', '_')
+        table_name = file['file_name'].split('.')[0].lower().replace(' ', '_')
 
-
+        
         # Get the database engine
         engine = get_or_create_database(project_id)
         Base = declarative_base()
@@ -73,17 +61,22 @@ def delete_data_sql(project_id: str, file_id: str):
         metadata.reflect(bind=engine)
         table = metadata.tables[table_name]
         if table is not None:
+            #Delete file from database
             Base.metadata.drop_all(engine, [table], checkfirst=True)
-
-        result = collection.delete_one({'_id': file_id})
+        else:
+            raise Exception('File not found in sql database')
+        
+        #Delete file from files metadata
+        result = delete_file_from_mongo(file_id, project_id)
         if result.acknowledged:
-            print("File deleted successfully.")
+            logger.info("File deleted successfully.")
             return {'success': True}
         else:
-            raise Exception("Failed to delete metadata")
+            raise Exception("Failed to delete file from metadata")
         
     except Exception as e:
-        update_mongo_delete_status(db, file_id, 'success')
-        print(f'Failed to delete file {file_id} from database {project_id}: {e}')
+        logger.info(f'Failed to delete file {file_id} from database {project_id}: {e}')
+        #Revert status to 'success' in case of failed deletion.
+        update_mongo_file_status({'_id': file_id, 'project_id': project_id}, {'$set': {'status': 'success'}})
         raise
 

@@ -25,9 +25,15 @@ from azure.core.credentials import AzureKeyCredential
 
 import os
 from typing import List
+import logging
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from config import Config
 from routes.docs.embeddings import get_embeddings
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def create_or_update_index(project_id: str):
     """

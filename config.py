@@ -30,4 +30,11 @@ class Config:
     # MongoDB
     MONGO_DB_URI = os.environ['MONGO_DB_URI']
     MONGO_DB_DATABASE = os.environ['MONGO_DB_DATABASE']
-    MONGO_DB_COLLECTION = os.environ['MONGO_DB_COLLECTION']
+    MONGO_FILE_COLLECTION = os.environ['MONGO_FILE_COLLECTION']
+    MONGO_META_COLLECTION = os.environ['MONGO_META_COLLECTION']
+
+    #TENCAITY
+    RETRY_ATTEMPTS = os.environ['RETRY_ATTEMPTS']
+    RETRY_MULTIPLIER = os.environ['RETRY_MULTIPLIER']
+    RETRY_MIN = os.environ['RETRY_MIN']
+    RETRY_MAX = os.environ['RETRY_MAX']

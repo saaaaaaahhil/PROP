@@ -8,13 +8,17 @@ from io import BytesIO
 import pandas as pd
 from threading import Lock
 import uuid
+import logging
 from config import Config
 
-from connections.mongo_db import mongodb_client
 
 from routes.csv.sql_operations import upload_to_sql, delete_data_sql
 from routes.csv.sql_agent_test import run_test_query
 from routes.csv.sql_agent import run_query
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix='/csv', tags=['CSV'])
 
@@ -36,7 +40,6 @@ async def read_xlsx_async(contents):
     # Running blocking I/O in an executor
     return await run_in_threadpool(pd.read_excel, BytesIO(contents))
 
-
 async def upload_data(
     background_tasks: BackgroundTasks,
     file: UploadFile,
@@ -45,12 +48,16 @@ async def upload_data(
     try:
         project_lock = await get_project_lock(project_id)
         async with project_lock:
-            print(f'Uploading file {file.filename} to {project_id} database.')
+            logger.info(f'Uploading file {file.filename} to {project_id} database.')
+
+            #Check file format
             if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
-                return JSONResponse(status_code=400, content={"message": f'File format for {file.filename} not supported, please upload a CSV or XLSX file.'})
-
+                raise Exception(f'File format for {file.filename} not supported, please upload a CSV or XLSX file.')
+            
             contents = await file.read()
-
+            
+            # Calculate file size in KB
+            file_size = len(contents) / 1024
 
             if file.filename.endswith('.csv'):
                 df = await read_csv_async(contents)
@@ -60,19 +67,15 @@ async def upload_data(
             df.columns = [c.lower().replace(' ', '_') for c in df.columns]
 
             file_name = file.filename.split('.')[0].lower().replace(' ', '_')
-            print(df.head())
+            logger.info(df.head())
 
-            background_tasks.add_task(upload_to_sql, project_id, df, file_name, file.filename)
-            print("Task added to background tasks.")
-        
-            return JSONResponse(status_code=200, content={"message": f'File {file.filename} uploaded successfully to {project_id} database.'})
+            background_tasks.add_task(upload_to_sql, project_id, df, file_name, file.filename, file_size)
+            logger.info("Task added to background tasks.")
+
+        return {'success': True}        
     except Exception as e:
-        print(f"Exception occurred: {e}")
-        db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
-        collection = db[str(Config.MONGO_DB_COLLECTION)]
-        query = {'_id': id}
-        update = {"$set": {"status": "fail"}}
-        await collection.update_one(query, update, upsert=True)
+        logger.info(f"Exception occurred: {e}")
+        raise
         return JSONResponse(status_code=500, content={"message": f'Error uploading file {file.filename} to {project_id} database: {e}'})
 
 
@@ -112,7 +115,6 @@ async def run_sql_query(
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": f'Error running query {query} on {project_id} database: {e}'})
 
-
 async def delete_data(
     background_tasks: BackgroundTasks,
     project_id: str,
@@ -121,18 +123,15 @@ async def delete_data(
     try:
         project_lock = await get_project_lock(project_id)
         async with project_lock:
-            print(f'Deleting file {file_id} from {project_id} database.')
+            logger.info(f'Deleting file {file_id} from {project_id} database.')
             
+            #Delete file from the database in background
             background_tasks.add_task(delete_data_sql, project_id, file_id)
 
-            return JSONResponse(status_code=200, content={"message": f'File {file_id} deleted successfully from {project_id} database.', "result": True})
+            return {'success': True}
 
     except Exception as e:
-            db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
-            collection = db[str(Config.MONGO_DB_COLLECTION)]
-            query = {'_id': file_id}
-            update = {"$set" : {'status': 'success'}}
-            collection.update_one(query, update)
+            raise
             return JSONResponse(status_code=500, content={"message": f'Error deleting file {file_id} from {project_id} database: {e}'})
 
 

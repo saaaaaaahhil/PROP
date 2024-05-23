@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from fastapi import Form
 from fastapi.responses import JSONResponse
-
+import time
 from starlette.concurrency import run_in_threadpool
 
 from routes.query_router.preprocess_query import preprocess_query
@@ -17,6 +17,7 @@ router = APIRouter(prefix='/run_user_query', tags=['final_query'])
 async def run_user_query(
     project_id: str = Form(...),
     query: str = Form(...)):
+    start_time = time.time()
     try:
         final_response = []
         response = await run_in_threadpool(preprocess_query, query)
@@ -36,11 +37,11 @@ async def run_user_query(
                 if ans['success']:
                     final_response.append(ans.get('answer', ''))
                 else:
-                    return JSONResponse(status_code=500, content={"message": f'Error running query'})
+                    raise
             else:
-                return JSONResponse(status_code=500, content={"message": f'Unknown category: {category}'})
+                return JSONResponse(status_code=500, content={"message": f'Unknown category: {category}', 'response_time': f'{round(time.time()-start_time,2)}s'})
         
-        return JSONResponse(status_code=200, content={"message": f'Query {query} ran successfully on {project_id} database.', 'result': final_response})
+        return JSONResponse(status_code=200, content={"message": f'Query {query} ran successfully on {project_id} database.', 'response_time': f'{round(time.time()-start_time,2)}s', 'result': final_response})
     
     except Exception as e:
-        return JSONResponse(status_code=500, content={"message": f'Error running query {query} on {project_id} database: {e}'})
+        return JSONResponse(status_code=500, content={"message": f'Error running query {query} on {project_id} database: {e}', 'response_time': f'{round(time.time()-start_time,2)}s'})
