@@ -15,19 +15,16 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from config import Config
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Retry configuration
 RETRY_WAIT = wait_exponential(multiplier=Config.RETRY_MULTIPLIER, min=Config.RETRY_MIN, max=Config.RETRY_MAX)
 RETRY_ATTEMPTS = Config.RETRY_ATTEMPTS
 
-llm = AzureChatOpenAI(
-    azure_deployment=os.environ['AZURE_OPENAI_CHAT_DEPLOYMENT_NAME'],
-    openai_api_version=os.environ['AZURE_OPENAI_API_VERSION']
-)
-
+# llm = AzureChatOpenAI(
+#     azure_deployment=os.environ['AZURE_OPENAI_CHAT_DEPLOYMENT_NAME'],
+#     openai_api_version=os.environ['AZURE_OPENAI_API_VERSION']
+# )
+llm = ChatOpenAI(temperature=0, model_name="gpt-4o")
 
 # Global cache for database connections and a lock for thread-safe operations
 # TODO : Test the concurrency of agent_executor.  If it is not thread-safe, we need to create a new agent_executor for each thread.
@@ -83,7 +80,7 @@ def get_agent_executor(project_id: str):
                 agent_cache[project_id] = agent_executor
         return agent_executor
     except Exception as e:
-        logger.info(f"Error getting agent executor: {e}")
+        print(f"Error getting agent executor: {e}")
         raise
         return None
 
@@ -97,6 +94,6 @@ def run_query(project_id: str, query: str):
         result = agent_executor.invoke(query)
         return {"success": True, "answer" : result['output']}
     except Exception as e:
-        logger.info(f"Error running query: {e}")
+        print(f"Error running query: {e}")
         raise
         return None

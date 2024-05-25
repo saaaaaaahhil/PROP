@@ -16,9 +16,6 @@ from routes.csv.sql_operations import upload_to_sql, delete_data_sql
 from routes.csv.sql_agent_test import run_test_query
 from routes.csv.sql_agent import run_query
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix='/csv', tags=['CSV'])
 
@@ -48,7 +45,7 @@ async def upload_data(
     try:
         project_lock = await get_project_lock(project_id)
         async with project_lock:
-            logger.info(f'Uploading file {file.filename} to {project_id} database.')
+            print(f'Uploading file {file.filename} to {project_id} database.')
 
             #Check file format
             if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
@@ -67,14 +64,14 @@ async def upload_data(
             df.columns = [c.lower().replace(' ', '_') for c in df.columns]
 
             file_name = file.filename.split('.')[0].lower().replace(' ', '_')
-            logger.info(df.head())
+            print(df.head())
 
             background_tasks.add_task(upload_to_sql, project_id, df, file_name, file.filename, file_size)
-            logger.info("Task added to background tasks.")
+            print("Task added to background tasks.")
 
         return {'success': True}        
     except Exception as e:
-        logger.info(f"Exception occurred: {e}")
+        print(f"Exception occurred: {e}")
         raise
         return JSONResponse(status_code=500, content={"message": f'Error uploading file {file.filename} to {project_id} database: {e}'})
 
@@ -123,7 +120,7 @@ async def delete_data(
     try:
         project_lock = await get_project_lock(project_id)
         async with project_lock:
-            logger.info(f'Deleting file {file_id} from {project_id} database.')
+            print(f'Deleting file {file_id} from {project_id} database.')
             
             #Delete file from the database in background
             background_tasks.add_task(delete_data_sql, project_id, file_id)

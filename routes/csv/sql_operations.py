@@ -5,10 +5,6 @@ from sqlalchemy import MetaData
 import logging
 from routes.mongo_db_functions import update_mongo_file_status, get_file, delete_file_from_mongo
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 
 def upload_to_sql(project_id: str, df: pd.DataFrame, filename: str, original_filename: str, file_size: float):
     """
@@ -16,7 +12,7 @@ def upload_to_sql(project_id: str, df: pd.DataFrame, filename: str, original_fil
     """
     file_uploaded_to_storage = False 
     try:
-        logger.info(f"Uploading DataFrame to SQL database {project_id}...")
+        print(f"Uploading DataFrame to SQL database {project_id}...")
         
         # Get the database engine
         engine = get_or_create_database(project_id)
@@ -29,11 +25,11 @@ def upload_to_sql(project_id: str, df: pd.DataFrame, filename: str, original_fil
         # Update the uploaded file's details in files metadata
         update_mongo_file_status({'file_name': original_filename, 'project_id': project_id},{'$set': {'file_size': f'{round(file_size,1)} KB', 'status': 'success'}})
 
-        logger.info("File Uploaded successfully")
+        print("File Uploaded successfully")
         return True
     
     except Exception as e:
-        logger.info(f"Error uploading DataFrame to SQL: {e}")
+        print(f"Error uploading DataFrame to SQL: {e}")
         # Update the uploaded file's details in files metadata
         if file_uploaded_to_storage == False:
             update_mongo_file_status({'file_name': original_filename, 'project_id': project_id}, {'$set': {'status': 'fail'}})
@@ -44,7 +40,7 @@ def delete_data_sql(project_id: str, file_id: str):
     This function takes a project_id and file_id and deletes file from database.
     """
     try:
-        logger.info(f'Deleting file from {project_id} database.')
+        print(f'Deleting file from {project_id} database.')
     
         # Check if file_id and project_id are valid
         file = get_file(file_id, project_id)
@@ -69,13 +65,13 @@ def delete_data_sql(project_id: str, file_id: str):
         #Delete file from files metadata
         result = delete_file_from_mongo(file_id, project_id)
         if result.acknowledged:
-            logger.info("File deleted successfully.")
+            print("File deleted successfully.")
             return {'success': True}
         else:
             raise Exception("Failed to delete file from metadata")
         
     except Exception as e:
-        logger.info(f'Failed to delete file {file_id} from database {project_id}: {e}')
+        print(f'Failed to delete file {file_id} from database {project_id}: {e}')
         #Revert status to 'success' in case of failed deletion.
         update_mongo_file_status({'_id': file_id, 'project_id': project_id}, {'$set': {'status': 'success'}})
         raise

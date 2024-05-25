@@ -10,17 +10,14 @@ import routes.docs.docs_router as docs_router
 import routes.images.images_router as images_router
 import routes.metadata.metadata_router as metadata_router
 import routes.query_router.router as query_router
+from routes.pitch.generate_pitch import generate_pitch
 import redis
 from config import Config
 import uuid
-import logging
 from datetime import datetime
 import time
 from routes.mongo_db_functions import get_project_files, check_file_exist, update_mongo_file_status
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 #Instantiate Redis
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
@@ -74,7 +71,7 @@ async def upload_file(
     id = str(uuid.uuid4())
     start_time = time.time()
     try:
-        logger.info(f'Uploading file {file.filename} to {project_id} database.')
+        print(f'Uploading file {file.filename} to {project_id} database.')
 
         #Check if file type is supported
         file_extension = file.filename.split('.')[-1].lower()
@@ -85,7 +82,7 @@ async def upload_file(
         check = check_file_exist({'file_name': file.filename, 'project_id': project_id})
         if check is not None:
             if check['status'] == 'success':
-                logger.info("File already exists in database !")
+                print("File already exists in database !")
                 return JSONResponse(status_code=400, content={"message": f'File {file.filename} already exists in database.', 'response_time': f'{round(time.time()-start_time,2)}s'})
             else:
                 id = check['_id']
@@ -126,7 +123,7 @@ async def delete_file(
     """
     start_time = time.time()
     try:
-        logger.info(f'Deleting file {file_id} from {project_id} database.')
+        print(f'Deleting file {file_id} from {project_id} database.')
 
         # Check if file exists for given project_id.
         file = check_file_exist({'_id': file_id, 'project_id': project_id},{'file_type': 1})
@@ -158,6 +155,27 @@ async def delete_file(
         # Restore file delete status to 'success' in case of failure
         update_mongo_file_status({'_id': file_id, 'project_id': project_id}, {"$set" : {'status': 'success'}}, False)
         return JSONResponse(status_code=500, content={"message": f'Error deleting the file: {file_id}', 'response_time': f'{round(time.time()-start_time,2)}s'})
+
+
+@app.post('/pitch_query', tags=['pitch_query'])
+async def run_pitch_query(
+    project_id : str = Form(...),
+    query: str = Form(...)):
+    """
+    This function takes project_id and query and generates a pitch.
+    """
+    start_time = time.time()
+    try:
+        print('Generating pitch from query')
+
+        response = await generate_pitch(project_id, query)
+
+        if response['success']:
+            return JSONResponse(status_code=200, content={'message': 'Pitch generated successfully', 'response_time': f'{round(time.time()-start_time,2)}s', 'result': response['answer']})
+        else:
+            raise
+    except Exception as e:
+        return JSONResponse(status_code=500, content={'message': f'Error generating pitch: {e}', 'response_time': f'{round(time.time()-start_time,2)}s'})
 
 if __name__ == '__main__':
     uvicorn.run('main:app', host='0.0.0.0', port=8000)

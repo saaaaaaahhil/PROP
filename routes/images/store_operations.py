@@ -4,9 +4,7 @@ from config import Config
 import logging
 from routes.mongo_db_functions import update_mongo_file_status, get_file ,delete_file_from_mongo
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
 
 def upload_image_to_store(project_id, contents, file_name, file_type):
     """
@@ -15,17 +13,17 @@ def upload_image_to_store(project_id, contents, file_name, file_type):
     file_uploaded_to_storage = False 
     try:
         if file_type not in ['image/jpeg', 'image/png']:
-            logger.info(f'File format for {file_name} not supported, please upload a JPEG or PNG image.')
+            print(f'File format for {file_name} not supported, please upload a JPEG or PNG image.')
             return {"success" : False, "message" : f'File format for {file_name} not supported, please upload a JPEG or PNG image.'}
         
-        logger.info(f"Uploading file {file_name} to Azure Blob Storage {project_id}...")
+        print(f"Uploading file {file_name} to Azure Blob Storage {project_id}...")
 
         file_size = len(contents) / 1024
 
         
         container_client = get_container_client(project_id)
         container_client.upload_blob(name=file_name, data=contents, overwrite=True)
-        logger.info(f"File {file_name} uploaded successfully.")
+        print(f"File {file_name} uploaded successfully.")
         
         file_uploaded_to_storage = True
         
@@ -37,7 +35,7 @@ def upload_image_to_store(project_id, contents, file_name, file_type):
         return {"success" : True, "message" : f"File {file_name} uploaded successfully."}
     
     except Exception as e:
-        logger.info(f"Error uploading file to Azure Blob Storage: {e}")
+        print(f"Error uploading file to Azure Blob Storage: {e}")
         if file_uploaded_to_storage == False:
             update_mongo_file_status({'file_name': file_name, 'project_id': project_id}, {'$set': {'status': 'fail'}})
         raise e
@@ -48,7 +46,7 @@ def delete_image_data(project_id: str, file_id: str):
     This function takes container_name and blob_name to delete blob from Azure Blob Storage.
     """
     try:
-        logger.info(f'Deleting file {file_id} from {project_id} database.')
+        print(f'Deleting file {file_id} from {project_id} database.')
         
         #Get file from metadata
         file = get_file(file_id, project_id)
@@ -65,13 +63,13 @@ def delete_image_data(project_id: str, file_id: str):
 
         result = delete_file_from_mongo(file_id, project_id)
         if result.acknowledged:
-            logger.info(f"File {blob_name} deleted successfully from project {project_id}.")
+            print(f"File {blob_name} deleted successfully from project {project_id}.")
             return {"success" : True, "message" : f"File {blob_name} deleted successfully from project {project_id}."}
         else:
             raise Exception('Failed to delete file from metadata.')
             
     except Exception as e:
-        logger.info(f"Failed to delete file {file_id} from project {project_id}")
+        print(f"Failed to delete file {file_id} from project {project_id}")
         update_mongo_file_status({'_id': file_id, 'project_id': project_id}, {'$set': {'status': 'success'}})
         raise 
         return {"success": False, "answer": "Failed to delete file!"}

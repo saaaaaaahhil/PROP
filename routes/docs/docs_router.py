@@ -14,9 +14,7 @@ from config import Config
 from routes.docs.store_operations import upload_document_to_index, delete_doc_data
 from routes.docs.search import run_rag_pipeline
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix='/doc', tags=['DOC'])
 
@@ -30,7 +28,7 @@ async def upload_doc(
         if file.content_type != 'application/pdf':
             return JSONResponse(status_code=400, content={"message": f'File format for {file.filename} not supported, please upload a PDF file.'})
 
-        logger.info(f'Uploading file {file.filename} to {project_id} index.')
+        print(f'Uploading file {file.filename} to {project_id} index.')
 
         file_type = file.content_type
         file_name = file.filename
@@ -39,7 +37,7 @@ async def upload_doc(
         background_tasks.add_task(upload_document_to_index, project_id, contents, file_name, file_type)
         return {'success': True}
     except Exception as e:
-        logger.info(f'Error uploading file: {e}')
+        print(f'Error uploading file: {e}')
         raise
         return JSONResponse(status_code=500, content={"message": f'Error uploading file.'})
         
@@ -50,7 +48,7 @@ async def run_doc_query(
     query: str = Form(...)):
 
     try:
-        logger.info(f'Running query for project {project_id}...')
+        print(f'Running query for project {project_id}...')
 
         response = await run_in_threadpool(run_rag_pipeline, project_id, query)
         if response["success"]:
@@ -58,7 +56,7 @@ async def run_doc_query(
         else:
             return JSONResponse(status_code=500, content={"message": f'Error running query.'})
     except Exception as e:
-        logger.info(f"Error running query: {e}")
+        print(f"Error running query: {e}")
         return JSONResponse(status_code=500, content={"message": f'Error running query.'})
         raise
     
@@ -68,13 +66,13 @@ async def delete_doc(
     file_id: str):
 
     try:
-        logger.info(f'Deleting file {file_id} from {project_id} database.')
+        print(f'Deleting file {file_id} from {project_id} database.')
 
         background_tasks.add_task(delete_doc_data, project_id, file_id)
         
         return {'success': True}
     except Exception as e:
-        logger.info(f"Error deleting file: {e}")
+        print(f"Error deleting file: {e}")
         raise
         return JSONResponse(status_code=500, content={"message": f'Error deleting file.'})
     

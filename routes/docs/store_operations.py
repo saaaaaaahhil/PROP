@@ -11,10 +11,6 @@ import logging
 from routes.mongo_db_functions import update_mongo_file_status, delete_file_from_mongo, get_file
 
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 
 def read_pdf(contents):
     data = ""
@@ -29,7 +25,7 @@ def chunkify_document(project_id, contents, file_type, file_name):
     """
     This function splits a document into chunks of text.
     """
-    logger.info(f"Chunkifying document {file_name} for project {project_id}.")
+    print(f"Chunkifying document {file_name} for project {project_id}.")
     data = ""
     if file_type == "application/pdf":
         data = read_pdf(contents)
@@ -44,7 +40,7 @@ def chunkify_document(project_id, contents, file_type, file_name):
     for chunk in text_splitter.split_text(data):
         embedding = embeddings.embed_query(chunk)
         docs.append({"id": str(uuid.uuid4()), "content": chunk, "content_vector": np.array(embedding, dtype=np.float32).tolist(), "project_id": project_id, "source": file_name})
-    logger.info(f"Document chunkified into {len(docs)} chunks.")
+    print(f"Document chunkified into {len(docs)} chunks.")
     return docs
 
 def upload_document_to_index(project_id, contents, file_name, file_type):
@@ -53,7 +49,7 @@ def upload_document_to_index(project_id, contents, file_name, file_type):
     """
     file_uploaded_to_storage = False 
     try:
-        logger.info(f"Uploading document {file_name} to index {project_id}...")
+        print(f"Uploading document {file_name} to index {project_id}...")
 
         chunks_id = []
         file_size = len(contents) / 1024
@@ -69,7 +65,7 @@ def upload_document_to_index(project_id, contents, file_name, file_type):
 
 
             index_client.upload_documents(docs)
-            logger.info(f"Document uploaded successfully.")
+            print(f"Document uploaded successfully.")
             file_uploaded_to_storage = True
 
             #Update File Status to 'success'
@@ -82,7 +78,7 @@ def upload_document_to_index(project_id, contents, file_name, file_type):
             raise Exception("Error retrieving search index client.")
     
     except Exception as e:
-        logger.info(f"Error uploading document to index: {e}")
+        print(f"Error uploading document to index: {e}")
         if file_uploaded_to_storage == False:
             update_mongo_file_status({'file_name': file_name, 'project_id': project_id}, {'$set': {'status': 'fail'}})
         raise
@@ -92,7 +88,7 @@ def delete_doc_data(project_id: str, file_id: str):
     This function takes container_name and blob_name to delete blob from Azure Blob Storage.
     """
     try:
-        logger.info(f'Deleting file {file_id} from {project_id} database.')
+        print(f'Deleting file {file_id} from {project_id} database.')
 
         #Get filename from metadata
         file = get_file(file_id, project_id)
@@ -108,7 +104,7 @@ def delete_doc_data(project_id: str, file_id: str):
             #Delete file from storage.
             result = index_client.delete_documents(documents)
             if result[0].succeeded:
-                logger.info("Documents deleted successfully.")
+                print("Documents deleted successfully.")
 
                 #Delete file from metadata.
                 result = delete_file_from_mongo(file_id, project_id)
@@ -117,13 +113,13 @@ def delete_doc_data(project_id: str, file_id: str):
             else:
                 #Revert file delete status to 'success' in case of failure
                 update_mongo_file_status({'_id': file_id, 'project_id': project_id}, {'$set' : {'status': 'success'}})
-                logger.info("Failed to delete documents:", result[0].error)
+                print("Failed to delete documents:", result[0].error)
                 return {"success": False, "answer": "Failed to delete file!"}
         else:
             raise Exception("Error retrieving search index client.")
         
     except Exception as e:
-        logger.info(f"Failed to delete file {file_id} from project {project_id}: {e}")
+        print(f"Failed to delete file {file_id} from project {project_id}: {e}")
         #Revert file delete status to 'success' in case of failure
         update_mongo_file_status({'_id': file_id, 'project_id': project_id}, {'$set' : {'status': 'success'}})
         raise

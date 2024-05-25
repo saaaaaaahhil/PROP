@@ -1,13 +1,14 @@
 from routes.images.blob_storage_operations import get_image_urls
 from config import Config
 import os
-from openai import AzureOpenAI
+from openai import AzureOpenAI, OpenAI
 
-client = AzureOpenAI(
-    api_key=os.environ['AZURE_OPENAI_API_KEY'],  
-    api_version=os.environ['AZURE_OPENAI_API_VERSION'],
-    azure_endpoint=os.environ['AZURE_OPENAI_ENDPOINT']
-)
+# client = AzureOpenAI(
+#     api_key=os.environ['AZURE_OPENAI_API_KEY'],  
+#     api_version=os.environ['AZURE_OPENAI_API_VERSION'],
+#     azure_endpoint=os.environ['AZURE_OPENAI_ENDPOINT']
+# )
+client = OpenAI()
 
 def query_images(project_id: str, query: str):
     """
@@ -41,7 +42,7 @@ def query_images(project_id: str, query: str):
         })
 
         response = client.chat.completions.create(
-            model=os.environ['AZURE_OPENAI_CHAT_DEPLOYMENT_NAME'],
+            model="gpt-4o",
             messages=messages,
             max_tokens=4000
         )

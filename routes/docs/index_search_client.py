@@ -13,9 +13,6 @@ index_clients = {}
 index_locks = {}
 global_lock = Lock()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 def get_lock(project_id):
 
@@ -52,6 +49,6 @@ def get_index_client(project_id):
             index_clients[project_id] = index_client
             return index_client
     except Exception as e:
-        logger.info(f"Error retrieving search index client: {e}")
+        print(f"Error retrieving search index client: {e}")
         raise
         return None
