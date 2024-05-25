@@ -3,7 +3,8 @@ from config import Config
 import re
 
 def get_blob_url(blob_name: str, project_id: str):
-    blob_url = Config.AZURE_BLOB_STORAGE_BASE_URL + "/" + project_id + "/" + blob_name
+    container_name = sanitize_container_name(project_id)
+    blob_url = Config.AZURE_BLOB_STORAGE_BASE_URL + "/" + container_name + "/" + blob_name
     return blob_url
 
 def get_image_urls(project_id: str):
