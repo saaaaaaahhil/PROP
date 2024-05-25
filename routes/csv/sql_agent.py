@@ -24,7 +24,7 @@ RETRY_ATTEMPTS = Config.RETRY_ATTEMPTS
 #     azure_deployment=os.environ['AZURE_OPENAI_CHAT_DEPLOYMENT_NAME'],
 #     openai_api_version=os.environ['AZURE_OPENAI_API_VERSION']
 # )
-llm = ChatOpenAI(temperature=0, model_name="gpt-4o")
+llm = ChatOpenAI(temperature=0.7, model_name="gpt-4o")
 
 # Global cache for database connections and a lock for thread-safe operations
 # TODO : Test the concurrency of agent_executor.  If it is not thread-safe, we need to create a new agent_executor for each thread.
@@ -71,8 +71,9 @@ def get_agent_executor(project_id: str):
                     toolkit=toolkit,
                     verbose=True,
                     suffix=os.environ['SQL_AGENT_PROMPT_SUFFIX'],
-                    agent_type="tool-calling",
+                    # agent_type="tool-calling",
                     # agent_type="zero-shot-react-description",
+                    agent_type="openai-functions",
                     agent_executor_kwargs={
                         "handle_parsing_errors":True
                     }
