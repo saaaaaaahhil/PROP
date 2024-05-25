@@ -1,5 +1,6 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import PyPDF2
+import docx
 import re
 import uuid
 import numpy as np
@@ -10,7 +11,17 @@ from routes.docs.index_search_client import get_index_client
 import logging
 from routes.mongo_db_functions import update_mongo_file_status, delete_file_from_mongo, get_file
 
-
+def read_docx(contents):
+    try:
+        data = ""
+        doc = docx.Document(BytesIO(contents))
+        for paragraph in doc.paragraphs:
+            data += paragraph.text + "\n"
+        data = re.sub(r'\s+', ' ', data).strip()
+        return data
+    except Exception as e:
+        print(f"Error reading DOCX file: {e}")
+        raise
 
 def read_pdf(contents):
     data = ""
@@ -29,8 +40,10 @@ def chunkify_document(project_id, contents, file_type, file_name):
     data = ""
     if file_type == "application/pdf":
         data = read_pdf(contents)
+    elif file_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        data = read_docx(contents)
     else:
-        raise Exception("Invalid file type. Only PDF files are supported.")
+        raise Exception("Invalid file type. Only PDF or DOCX files are supported.")
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=Config.RAG_CHUNK_SIZE, chunk_overlap=Config.RAG_CHUNK_OVERLAP, length_function=len, is_separator_regex=False)
     embeddings = get_embeddings()

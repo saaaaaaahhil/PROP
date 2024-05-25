@@ -75,7 +75,7 @@ async def upload_file(
 
         #Check if file type is supported
         file_extension = file.filename.split('.')[-1].lower()
-        if file_extension not in ["csv", "pdf", "jpg", "jpeg", "png", "xlsx"]:
+        if file_extension not in ["csv", "pdf", "jpg", "jpeg", "png", "xlsx", "docx"]:
             return JSONResponse(status_code=400, content={"message": f'Invalid file format: {file_extension}.', 'response_time': f'{round(time.time()-start_time,2)}s'})
         
         # Check if file already exists for given project
@@ -98,7 +98,8 @@ async def upload_file(
             'pdf': upload_doc,
             'jpg': upload_image,
             'jpeg': upload_image,
-            'png' : upload_image
+            'png' : upload_image,
+            'docx': upload_doc
         }
 
         response = await upload_routes[file_extension](background_tasks, file, project_id, id)
@@ -136,7 +137,8 @@ async def delete_file(
             'pdf'  : delete_doc,
             'jpeg' : delete_image,
             'jpg'  : delete_image,
-            'png'  : delete_image
+            'png'  : delete_image,
+            'docx' : delete_doc
         }
         
         #Update file delete status to 'deleting'.

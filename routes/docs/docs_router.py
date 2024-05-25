@@ -14,8 +14,6 @@ from config import Config
 from routes.docs.store_operations import upload_document_to_index, delete_doc_data
 from routes.docs.search import run_rag_pipeline
 
-
-
 router = APIRouter(prefix='/doc', tags=['DOC'])
 
 async def upload_doc(
@@ -25,8 +23,8 @@ async def upload_doc(
     id: str):
 
     try:
-        if file.content_type != 'application/pdf':
-            return JSONResponse(status_code=400, content={"message": f'File format for {file.filename} not supported, please upload a PDF file.'})
+        if file.content_type != 'application/pdf' and file.content_type != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+            return JSONResponse(status_code=400, content={"message": f'File format for {file.filename} not supported, please upload a PDF or a DOCX file.'})
 
         print(f'Uploading file {file.filename} to {project_id} index.')
 
