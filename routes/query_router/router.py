@@ -64,6 +64,7 @@ def execute_single_query(response: dict, category_functions: dict, project_id: s
         else:
             return {'success': False}
     except Exception as e:
+        raise
         return {'success': False}
     
 def execute_queries_parallel(category_functions: dict, project_id: str, response: list):
