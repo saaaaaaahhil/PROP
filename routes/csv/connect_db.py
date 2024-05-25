@@ -5,6 +5,7 @@ from threading import Lock
 from config import Config
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
+from routes.exceptions import RetryableException
 
 # Retry configuration
 RETRY_WAIT = wait_exponential(multiplier=Config.RETRY_MULTIPLIER, min=Config.RETRY_MIN, max=Config.RETRY_MAX)
@@ -25,7 +26,6 @@ def get_lock(project_id):
             locks[project_id] = Lock()
         return locks[project_id]
 
-@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(Exception))
 def get_engine(db_name):
     global engines
 
@@ -48,35 +48,41 @@ def get_engine(db_name):
         engines[db_name] = engine
         return engine
 
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def get_or_create_database(project_id):
-    with get_lock(project_id):
-        if project_id in engines:
-            print(f"Engine for {project_id} already exists.")
-            return engines[project_id]
+    try:
+        with get_lock(project_id):
+            if project_id in engines:
+                print(f"Engine for {project_id} already exists.")
+                return engines[project_id]
 
-        default_db = Config.POSTGRES_DEFAULT_DB  # Typically 'postgres'
-        engine = get_engine(default_db)
+            default_db = Config.POSTGRES_DEFAULT_DB  # Typically 'postgres'
+            engine = get_engine(default_db)
 
-        # Connection in autocommit mode for operations that can't run in a transaction
-        connection = engine.connect()
-        connection.execution_options(isolation_level="AUTOCOMMIT")
+            # Connection in autocommit mode for operations that can't run in a transaction
+            connection = engine.connect()
+            connection.execution_options(isolation_level="AUTOCOMMIT")
 
-        try:
-            # Check if database already exists
-            result = connection.execute(text(f"SELECT 1 FROM pg_database WHERE datname='{project_id}'"))
-            exists = result.fetchone()
-            if not exists:
-                # Create new database if it doesn't exist
-                connection.execute(text(f"CREATE DATABASE {project_id}"))
-                print(f"Database {project_id} created.")
-            else:
-                print(f"Database {project_id} already exists.")
-        except SQLAlchemyError as e:
-            print(f"Error creating database: {str(e)}")
-            raise
-        finally:
-            connection.close()
-            engine.dispose()
+            try:
+                # Check if database already exists
+                result = connection.execute(text(f"SELECT 1 FROM pg_database WHERE datname='{project_id}'"))
+                exists = result.fetchone()
+                if not exists:
+                    # Create new database if it doesn't exist
+                    connection.execute(text(f"CREATE DATABASE {project_id}"))
+                    print(f"Database {project_id} created.")
+                else:
+                    print(f"Database {project_id} already exists.")
+            except SQLAlchemyError as e:
+                print(f"Error creating database: {str(e)}")
+                raise
+            finally:
+                connection.close()
+                engine.dispose()
 
-    # Return the engine connected to the newly created or existing database
-    return get_engine(project_id)
+        # Return the engine connected to the newly created or existing database
+        return get_engine(project_id)
+    except Exception as e:
+        print(f"Error creating database: {e}")
+        raise RetryableException(f"Error creating database: {e}")
+        return None

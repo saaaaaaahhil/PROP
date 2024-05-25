@@ -2,7 +2,15 @@ from groq import Groq
 import os
 import json
 from openai import AzureOpenAI, OpenAI
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from routes.query_router.preprocess_query import preprocess_query
+
+from config import Config
+from routes.exceptions import RetryableException
+
+# Retry configuration
+RETRY_WAIT = wait_exponential(multiplier=Config.RETRY_MULTIPLIER, min=Config.RETRY_MIN, max=Config.RETRY_MAX)
+RETRY_ATTEMPTS = Config.RETRY_ATTEMPTS
 
 # client = AzureOpenAI(
 #     api_key=os.environ['AZURE_OPENAI_API_KEY'],  
@@ -14,6 +22,7 @@ client = OpenAI()
 # MODEL = os.environ['AZURE_OPENAI_CHAT_DEPLOYMENT_NAME']
 MODEL = "gpt-4o"
 
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def generate_queries_from_pitch(user_query: str):
     """
     This function takes a pitch query and returns the list of generated queries.
@@ -114,7 +123,7 @@ def generate_queries_from_pitch(user_query: str):
 
     except Exception as e:
         print(f"Error generating queries: {e}")
-        raise e
+        raise RetryableException(f"Error generating queries: {e}")
 
 
 def get_query_category(queries: list):
@@ -132,6 +141,7 @@ def get_query_category(queries: list):
         print(f"Error classifying queries: {e}")
         raise e
 
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def summarize_to_generate_pitch(query: str, data: str):
     """
     This function takes the user query and data extracted from database and generates a pitch
@@ -165,4 +175,4 @@ def summarize_to_generate_pitch(query: str, data: str):
 
     except Exception as e:
         print(f"Error generating pitch: {e}")
-        raise e
+        raise RetryableException(f"Error generating pitch: {e}")

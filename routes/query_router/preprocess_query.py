@@ -5,6 +5,8 @@ import json
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from config import Config
 
+from routes.exceptions import RetryableException
+
 # Retry configuration
 RETRY_WAIT = wait_exponential(multiplier=Config.RETRY_MULTIPLIER, min=Config.RETRY_MIN, max=Config.RETRY_MAX)
 RETRY_ATTEMPTS = Config.RETRY_ATTEMPTS
@@ -159,7 +161,7 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
   
   Do not provide any explanation or additional information in your response."""
 
-@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(Exception))
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def preprocess_query(query: str):
     """
     This function classifies the query into one of the relevant categories(also breaking the query into granular queries if needed).
@@ -193,7 +195,7 @@ def preprocess_query(query: str):
 
     except Exception as e:
         print(f"Error preprocessing query: {e}")
-        raise
+        raise RetryableException(f"Error preprocessing query: {e}")
         return None
     
 

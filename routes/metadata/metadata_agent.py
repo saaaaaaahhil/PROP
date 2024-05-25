@@ -5,6 +5,8 @@ import json
 from config import Config
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
+from routes.exceptions import RetryableException
+
 # Retry configuration
 RETRY_WAIT = wait_exponential(multiplier=Config.RETRY_MULTIPLIER, min=Config.RETRY_MIN, max=Config.RETRY_MAX)
 RETRY_ATTEMPTS = Config.RETRY_ATTEMPTS
@@ -15,7 +17,7 @@ MODEL = 'llama3-70b-8192'
 # MODEL='gpt-4o'
 # client = OpenAI()
 
-@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(Exception))
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def get_query_category(user_query: str):
     """
     This function takes a query and returns the category of query for eg. healthcare/landmark.
@@ -52,9 +54,9 @@ def get_query_category(user_query: str):
 
     except Exception as e:
         print(f"Error predicting category: {e}")
-        raise
+        raise RetryableException(f"Error predicting category: {e}")
 
-@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(Exception))
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def get_query_response(data: str, user_query: str):
     """
     This function takes a query and data to be inferred upon and returns the answer to user query.
@@ -94,4 +96,4 @@ def get_query_response(data: str, user_query: str):
     
     except Exception as e:
         print(f"Error generating answer: {e}")
-        raise
+        raise RetryableException(f"Error generating answer: {e}")

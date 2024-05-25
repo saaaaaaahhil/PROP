@@ -14,6 +14,7 @@ from threading import Lock
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from config import Config
+from routes.exceptions import RetryableException
 
 
 # Retry configuration
@@ -41,7 +42,7 @@ def get_lock(db_name):
             cache_locks[db_name] = Lock()
         return cache_locks[db_name]
 
-@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(Exception))
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def get_agent_executor(project_id: str):
     global global_lock, agent_cache
 
@@ -82,7 +83,7 @@ def get_agent_executor(project_id: str):
         return agent_executor
     except Exception as e:
         print(f"Error getting agent executor: {e}")
-        raise
+        raise RetryableException(f"Error getting agent executor: {e}")
         return None
 
 # have optional agent type with default zero-shot-react-description
