@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine, text
+import re
 from sqlalchemy.exc import SQLAlchemyError
 from urllib.parse import quote_plus
 from threading import Lock
@@ -26,6 +27,13 @@ def get_lock(project_id):
             locks[project_id] = Lock()
         return locks[project_id]
 
+def sanitize_project_id(project_id):
+    # Ensure the project_id starts with a letter and replace invalid characters with an underscore
+    if not project_id[0].isalpha():
+        project_id = 'p_' + project_id
+    sanitized_id = re.sub(r'[^a-zA-Z0-9_]', '_', project_id)
+    return sanitized_id
+
 def get_engine(db_name):
     global engines
 
@@ -50,11 +58,12 @@ def get_engine(db_name):
 
 @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def get_or_create_database(project_id):
+    sanitized_project_id = sanitize_project_id(project_id)
     try:
-        with get_lock(project_id):
-            if project_id in engines:
-                print(f"Engine for {project_id} already exists.")
-                return engines[project_id]
+        with get_lock(sanitized_project_id):
+            if sanitized_project_id in engines:
+                print(f"Engine for {sanitized_project_id} already exists.")
+                return engines[sanitized_project_id]
 
             default_db = Config.POSTGRES_DEFAULT_DB  # Typically 'postgres'
             engine = get_engine(default_db)
@@ -65,14 +74,14 @@ def get_or_create_database(project_id):
 
             try:
                 # Check if database already exists
-                result = connection.execute(text(f"SELECT 1 FROM pg_database WHERE datname='{project_id}'"))
+                result = connection.execute(text(f"SELECT 1 FROM pg_database WHERE datname='{sanitized_project_id}'"))
                 exists = result.fetchone()
                 if not exists:
                     # Create new database if it doesn't exist
-                    connection.execute(text(f"CREATE DATABASE {project_id}"))
-                    print(f"Database {project_id} created.")
+                    connection.execute(text(f"CREATE DATABASE {sanitized_project_id}"))
+                    print(f"Database {sanitized_project_id} created.")
                 else:
-                    print(f"Database {project_id} already exists.")
+                    print(f"Database {sanitized_project_id} already exists.")
             except SQLAlchemyError as e:
                 print(f"Error creating database: {str(e)}")
                 raise
@@ -81,7 +90,7 @@ def get_or_create_database(project_id):
                 engine.dispose()
 
         # Return the engine connected to the newly created or existing database
-        return get_engine(project_id)
+        return get_engine(sanitized_project_id)
     except Exception as e:
         print(f"Error creating database: {e}")
         raise RetryableException(f"Error creating database: {e}")

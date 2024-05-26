@@ -15,6 +15,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from config import Config
 from routes.exceptions import RetryableException
+from routes.csv.connect_db import sanitize_project_id
 
 
 # Retry configuration
@@ -45,19 +46,20 @@ def get_lock(db_name):
 @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def get_agent_executor(project_id: str):
     global global_lock, agent_cache
+    sanitized_project_id = sanitize_project_id(project_id)
 
     try:
-        agent_lock = get_lock(project_id)
+        agent_lock = get_lock(sanitized_project_id)
         with agent_lock:
-            if project_id in agent_cache:
-                agent_executor = agent_cache[project_id]
+            if sanitized_project_id in agent_cache:
+                agent_executor = agent_cache[sanitized_project_id]
             else:
                 # Database connection parameters
                 db_username = Config.POSTGRES_USER
                 db_password = Config.POSTGRES_PASSWORD
                 db_host = Config.POSTGRES_HOST
                 db_port = Config.POSTGRES_PORT
-                db_name = project_id
+                db_name = sanitized_project_id
 
                 encoded_password = quote_plus(db_password)
 
@@ -79,7 +81,7 @@ def get_agent_executor(project_id: str):
                         "handle_parsing_errors":True
                     }
                 )
-                agent_cache[project_id] = agent_executor
+                agent_cache[sanitized_project_id] = agent_executor
         return agent_executor
     except Exception as e:
         print(f"Error getting agent executor: {e}")

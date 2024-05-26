@@ -49,7 +49,6 @@ def delete_data_sql(project_id: str, file_id: str):
         
         table_name = file['file_name'].split('.')[0].lower().replace(' ', '_')
 
-        
         # Get the database engine
         engine = get_or_create_database(project_id)
         Base = declarative_base()
