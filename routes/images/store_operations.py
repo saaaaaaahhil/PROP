@@ -1,10 +1,7 @@
 from routes.images.blob_storage_operations import get_container_client
 from connections.mongo_db import mongodb_client
 from config import Config
-import logging
 from routes.mongo_db_functions import update_mongo_file_status, get_file ,delete_file_from_mongo, update_project_version
-from PIL import Image
-from io import BytesIO
 
 def upload_image_to_store(project_id, contents, file_name, file_type):
     """

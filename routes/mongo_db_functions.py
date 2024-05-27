@@ -1,5 +1,5 @@
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from connections.mongo_db import file_collection, meta_collection, project_collection
+from connections.mongo_db import file_collection, meta_collection
 from config import Config
 
 # Retry configuration
@@ -109,10 +109,11 @@ def get_project_version(project_id: str):
     This function returns a project version.
     """
     try:
-        check = project_collection.find_one({'_id': project_id})
-        if check is None:
-            raise Exception(f'{project_id} not found.')
-        return check['version']
+        # check = project_collection.find_one({'_id': project_id})
+        # if check is None:
+        #     raise Exception(f'{project_id} not found.')
+        # return check['version']
+        return 1
     except Exception as e:
         print(f'Error getting project version: {e}')
         raise e

@@ -6,7 +6,7 @@ try:
     db = mongodb_client[str(Config.MONGO_DB_DATABASE)]
     file_collection = db[str(Config.MONGO_FILE_COLLECTION)]
     meta_collection = db[str(Config.MONGO_META_COLLECTION)]
-    project_collection = db[str(Config.MONGO_PROJECT_COLLECTION)]
+    # project_collection = db[str(Config.MONGO_PROJECT_COLLECTION)]
 except Exception as e:
     print(f"MongoDB connection unsuccessfull: {e}")
     raise
