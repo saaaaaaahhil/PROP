@@ -44,4 +44,4 @@ async def generate_pitch(project_id: str, query:str):
         print(pitch)
         return {'success': True, "answer": pitch['pitch']}
     except Exception as e:
-        raise e
+        return {'success': False, "failure": f'Failure in pitch agent: {e}'}

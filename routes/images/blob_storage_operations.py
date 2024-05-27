@@ -5,6 +5,7 @@ import re
 def get_blob_url(blob_name: str, project_id: str):
     container_name = sanitize_container_name(project_id)
     blob_url = Config.AZURE_BLOB_STORAGE_BASE_URL + "/" + container_name + "/" + blob_name
+    print(blob_url)
     return blob_url
 
 def get_image_urls(project_id: str):

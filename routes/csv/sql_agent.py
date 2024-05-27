@@ -99,5 +99,4 @@ def run_query(project_id: str, query: str):
         return {"success": True, "answer" : result['output']}
     except Exception as e:
         print(f"Error running query: {e}")
-        raise
-        return None
+        return {"success": False, "failure" : f'Failure in csv agent: {e}'}

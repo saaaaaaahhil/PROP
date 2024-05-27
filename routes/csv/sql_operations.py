@@ -3,7 +3,7 @@ import pandas as pd
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import MetaData
 import logging
-from routes.mongo_db_functions import update_mongo_file_status, get_file, delete_file_from_mongo
+from routes.mongo_db_functions import update_mongo_file_status, get_file, delete_file_from_mongo, update_project_version
 
 
 def upload_to_sql(project_id: str, df: pd.DataFrame, filename: str, original_filename: str, file_size: float):
@@ -24,6 +24,9 @@ def upload_to_sql(project_id: str, df: pd.DataFrame, filename: str, original_fil
 
         # Update the uploaded file's details in files metadata
         update_mongo_file_status({'file_name': original_filename, 'project_id': project_id},{'$set': {'file_size': f'{round(file_size,1)} KB', 'status': 'success'}})
+
+        #Update project version
+        # update_project_version(project_id)
 
         print("File Uploaded successfully")
         return True
@@ -58,6 +61,10 @@ def delete_data_sql(project_id: str, file_id: str):
         if table is not None:
             #Delete file from database
             Base.metadata.drop_all(engine, [table], checkfirst=True)
+            
+            #Update project version
+            # update_project_version(project_id)
+            
         else:
             raise Exception('File not found in sql database')
         

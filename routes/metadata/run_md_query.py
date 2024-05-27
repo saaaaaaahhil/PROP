@@ -10,4 +10,4 @@ def run_md_query(project_id:str , query: str):
         
         except Exception as e:
             print(f"Error running metadata query. {e}")
-            raise
+            return {"success": False, 'failure' : f'Failure in metadata agent: {e}'}

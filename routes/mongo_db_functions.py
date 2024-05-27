@@ -1,5 +1,5 @@
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from connections.mongo_db import file_collection, meta_collection
+from connections.mongo_db import file_collection, meta_collection, project_collection
 from config import Config
 
 # Retry configuration
@@ -86,3 +86,34 @@ def check_file_exist(query, projection ={}):
     except Exception as e:
         print("Status check failed")
         raise 
+
+def update_project_version(project_id: str):
+    """
+    This function updates the version number of project whenever file is uploaded or deleted.
+    """
+    try:
+        pass
+        # check = project_collection.find_one({'_id': project_id})
+        # if check is not None:
+        #     current_version = check['version']
+        #     project_collection.update_one({'_id': project_id}, {'$set':{'version': (current_version+1)%100}})
+        #     return {'success': True}
+        # project_collection.update_one({'_id': project_id}, {'$set':{'version': 0}}, upsert=True)
+        # return {'success': True}
+    except Exception as e:
+        print(f'Error updating project version: {e}')
+        raise e
+    
+def get_project_version(project_id: str):
+    """
+    This function returns a project version.
+    """
+    try:
+        check = project_collection.find_one({'_id': project_id})
+        if check is None:
+            raise Exception(f'{project_id} not found.')
+        return check['version']
+    except Exception as e:
+        print(f'Error getting project version: {e}')
+        raise e
+    

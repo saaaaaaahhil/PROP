@@ -49,5 +49,4 @@ def query_images(project_id: str, query: str):
         return {"success" : True, "answer" : response.choices[0].message.content}
     except Exception as e:
         print(f"Error querying images: {e}")
-        raise
-        return {"success" : False, "message" : f"Error querying images: {e}"}
+        return {"success" : False, "failure" : f"Error in image agent: {e}"}

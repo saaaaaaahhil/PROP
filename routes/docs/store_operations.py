@@ -9,7 +9,7 @@ from config import Config
 from routes.docs.embeddings import get_embeddings
 from routes.docs.index_search_client import get_index_client
 import logging
-from routes.mongo_db_functions import update_mongo_file_status, delete_file_from_mongo, get_file
+from routes.mongo_db_functions import update_mongo_file_status, delete_file_from_mongo, get_file, update_project_version
 
 def read_docx(contents):
     try:
@@ -81,6 +81,10 @@ def upload_document_to_index(project_id, contents, file_name, file_type):
             print(f"Document uploaded successfully.")
             file_uploaded_to_storage = True
 
+            
+            #Update project version
+            # update_project_version(project_id)
+
             #Update File Status to 'success'
             query = {'file_name': file_name, 'project_id': project_id}
             update = {"$set": {'file_size': f'{round(file_size,1)} KB', 'chunks':chunks_id, "status": 'success'}}
@@ -118,6 +122,9 @@ def delete_doc_data(project_id: str, file_id: str):
             result = index_client.delete_documents(documents)
             if result[0].succeeded:
                 print("Documents deleted successfully.")
+
+                #Update project version
+                update_project_version(project_id)
 
                 #Delete file from metadata.
                 result = delete_file_from_mongo(file_id, project_id)

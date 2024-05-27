@@ -87,5 +87,4 @@ def run_rag_pipeline(project_id, query):
 
     except Exception as e:
         print(f"Error running RAG pipeline: {e}")
-        raise
-        return {"success": False, "message": str(e)}
+        return {"success": False, "failure": f'Error in docs agent: {e}'}
