@@ -74,9 +74,9 @@ def get_agent_executor(project_id: str):
                     toolkit=toolkit,
                     verbose=True,
                     suffix=os.environ['SQL_AGENT_PROMPT_SUFFIX'],
-                    # agent_type="tool-calling",
+                    agent_type="tool-calling",
                     # agent_type="zero-shot-react-description",
-                    agent_type="openai-functions",
+                    # agent_type="openai-functions",
                     agent_executor_kwargs={
                         "handle_parsing_errors":True
                     }
