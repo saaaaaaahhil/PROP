@@ -1,5 +1,5 @@
 from groq import Groq
-import os
+from routes.llm_connections import openai_client
 import json
 from openai import AzureOpenAI, OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -9,15 +9,8 @@ from config import Config
 from routes.exceptions import RetryableException
 
 # Retry configuration
-RETRY_WAIT = wait_exponential(multiplier=Config.RETRY_MULTIPLIER, min=Config.RETRY_MIN, max=Config.RETRY_MAX)
-RETRY_ATTEMPTS = Config.RETRY_ATTEMPTS
-
-# client = AzureOpenAI(
-#     api_key=os.environ['AZURE_OPENAI_API_KEY'],  
-#     api_version=os.environ['AZURE_OPENAI_API_VERSION'],
-#     azure_endpoint=os.environ['AZURE_OPENAI_ENDPOINT']
-# )
-client = OpenAI()
+RETRY_WAIT = wait_exponential(multiplier=int(Config.RETRY_MULTIPLIER), min=int(Config.RETRY_MIN), max=int(Config.RETRY_MAX))
+RETRY_ATTEMPTS = int(Config.RETRY_ATTEMPTS)
 
 # MODEL = os.environ['AZURE_OPENAI_CHAT_DEPLOYMENT_NAME']
 MODEL = "gpt-4o"
@@ -110,7 +103,7 @@ def generate_queries_from_pitch(user_query: str):
                 "content": user_query 
             }
         ]
-        response = client.chat.completions.create(
+        response = openai_client.chat.completions.create(
             model=MODEL,
             messages=messages,
             max_tokens=4096,   
@@ -160,7 +153,7 @@ def summarize_to_generate_pitch(query: str, data: str):
                 "content": encoded_query 
             }
         ]
-        response = client.chat.completions.create(
+        response = openai_client.chat.completions.create(
             model=MODEL,
             messages=messages,
             max_tokens=4096,

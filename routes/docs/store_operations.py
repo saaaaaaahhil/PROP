@@ -8,7 +8,6 @@ from io import BytesIO
 from config import Config
 from routes.docs.embeddings import get_embeddings
 from routes.docs.index_search_client import get_index_client
-import logging
 from routes.mongo_db_functions import update_mongo_file_status, delete_file_from_mongo, get_file, update_project_version
 
 def read_docx(contents):

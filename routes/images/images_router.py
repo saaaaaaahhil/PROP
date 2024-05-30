@@ -66,7 +66,6 @@ async def delete_image(
         return {'success': True}
     except Exception as e:
         print(f"Error deleting file: {e}")
-        raise
-        return JSONResponse(status_code=500, content={"message": f'Error deleting file.'})
+        return {'success': False, 'failure': f'Failed to delete image file: {e}'}
         
     

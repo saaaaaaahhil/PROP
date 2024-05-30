@@ -5,17 +5,17 @@ import json
 from config import Config
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
+from strictjson import *
+from routes.llm_connections import groq_client
 from routes.exceptions import RetryableException
 
 # Retry configuration
-RETRY_WAIT = wait_exponential(multiplier=Config.RETRY_MULTIPLIER, min=Config.RETRY_MIN, max=Config.RETRY_MAX)
-RETRY_ATTEMPTS = Config.RETRY_ATTEMPTS
+RETRY_WAIT = wait_exponential(multiplier=int(Config.RETRY_MULTIPLIER), min=int(Config.RETRY_MIN), max=int(Config.RETRY_MAX))
+RETRY_ATTEMPTS = int(Config.RETRY_ATTEMPTS)
 
 
-client = Groq(api_key=os.environ['GROQ_API_KEY'])
 MODEL = 'llama3-70b-8192'
 # MODEL='gpt-4o'
-# client = OpenAI()
 
 @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def get_query_category(user_query: str):
@@ -37,7 +37,7 @@ def get_query_category(user_query: str):
                 "content": user_query 
             }
         ]
-        response = client.chat.completions.create(
+        response = groq_client.chat.completions.create(
             model=MODEL,
             messages=messages,
             temperature=0.5,
@@ -63,37 +63,55 @@ def get_query_response(data: str, user_query: str):
     """
     encoded_query =  user_query + "\n" + str(data)
     try:
-        messages=[
-            {
-                "role": "system",
-                "content": """You are a Natural Language Processing API capable of answering user queries by analyzing the data provided to you. You should respond in JSON format with the following schema:
+        system_prompt = """
+        You are a Natural Language Processing API capable of answering user queries by analyzing the data provided to you. You should respond in JSON format with the following schema:
+        {
+            'answer': 'output in string format'
+        }
 
-                {
-                    'answer':'output in string format'
-                }
+        You need to identify what is required in the query and appropriately answer the query using the project data provided to you along with the query. The data provided to you belongs to a certain project, and from that, you can answer queries like what is the AQI around the property, how far is the project from certain landmarks, what are the nearest hospitals/schools, etc., from the property. If the answer is not found in the data, return 'No results found!' as the answer.
 
-                You need to identify what is required in the query and appropriately answer the query using the project data provided to you along with the query. The data provided to you belongs to a certain project and from that you can answer queries like what is the AQI around the property, how far is the project from certain landmarks, what are the nearest hospitals/schools, etc., from the property. If the answer is not found in the data, return 'No results found!' as the answer. Respond with proper json format without any escape characters and extra curly braces."""
-            },
-            {
-                "role": "user",
-                "content": encoded_query
-            }
-        ]
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=messages,
-            temperature=1,
-            max_tokens=1024,
-            top_p=1,
-            stream=False,
-            response_format={"type": "json_object"},
-            stop=None
-        )
-        response_message = response.choices[0].message.content
-        json_string = response_message
-        json_object = json.loads(json_string)
-        return json_object["answer"]
-    
+        Format the 'answer' field using Markdown. Use the following guidelines:
+        - Use headings for important sections, indicated by `#` for the main heading.
+        - Use subheadings, indicated by `##`, for secondary sections.
+        - Use bullet points `-` for listing items.
+        - Use bold text `**` for highlighting important information.
+        - Use code blocks for any structured data or examples.
+
+        Example response format:
+
+        {
+            "answer": "# Key Information\\n\\n- **AQI:** 42\\n- **Nearest Hospital:** XYZ Hospital\\n- **Distance to Landmark:** 2.5 km\\n\\nNo results found!"
+        }
+
+        Ensure the 'answer' field in the JSON response is properly formatted in Markdown and the JSON response is valid. Do not include any extra escape characters or newline characters inside the JSON object.
+        """
+        res = strict_json(system_prompt = system_prompt,
+                    user_prompt = encoded_query,
+                    output_format ={
+                                    "answer": "## Key Information\n- **AQI:** 42\n- **Nearest Hospital:** XYZ Hospital\n- **Distance to Landmark:** 2.5 km\n\n`No results found!`"},
+                    llm = llm)
+        
+        return res['answer']
+
     except Exception as e:
         print(f"Error generating answer: {e}")
         raise RetryableException(f"Error generating answer: {e}")
+
+def llm(system_prompt: str, user_prompt: str):
+    # ensure your LLM imports are all within this function
+    from groq import Groq
+
+    # define your own LLM here
+    client = Groq(api_key=os.environ['GROQ_API_KEY'])
+    MODEL = 'llama3-70b-8192'
+
+    response = client.chat.completions.create(
+        model=MODEL,
+        temperature = 0,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+    )
+    return response.choices[0].message.content

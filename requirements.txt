@@ -23,3 +23,4 @@ flower
 celery[redis]
 pymongo
 python-docx
+strictjson

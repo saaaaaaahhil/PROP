@@ -9,24 +9,17 @@ from langchain_groq import ChatGroq
 from langchain_anthropic import ChatAnthropic
 from urllib.parse import quote_plus
 import os
-import logging
 from threading import Lock
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-
+from routes.llm_connections import llm_openai
 from config import Config
 from routes.exceptions import RetryableException
 from routes.csv.connect_db import sanitize_project_id
 
 
 # Retry configuration
-RETRY_WAIT = wait_exponential(multiplier=Config.RETRY_MULTIPLIER, min=Config.RETRY_MIN, max=Config.RETRY_MAX)
-RETRY_ATTEMPTS = Config.RETRY_ATTEMPTS
-
-# llm = AzureChatOpenAI(
-#     azure_deployment=os.environ['AZURE_OPENAI_CHAT_DEPLOYMENT_NAME'],
-#     openai_api_version=os.environ['AZURE_OPENAI_API_VERSION']
-# )
-llm = ChatOpenAI(temperature=0.7, model_name="gpt-4o")
+RETRY_WAIT = wait_exponential(multiplier=int(Config.RETRY_MULTIPLIER), min=int(Config.RETRY_MIN), max=int(Config.RETRY_MAX))
+RETRY_ATTEMPTS = int(Config.RETRY_ATTEMPTS)
 
 # Global cache for database connections and a lock for thread-safe operations
 # TODO : Test the concurrency of agent_executor.  If it is not thread-safe, we need to create a new agent_executor for each thread.
@@ -67,10 +60,10 @@ def get_agent_executor(project_id: str):
 
                 db = SQLDatabase.from_uri(pg_uri)
 
-                toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+                toolkit = SQLDatabaseToolkit(db=db, llm=llm_openai)
 
                 agent_executor = create_sql_agent(
-                    llm=llm,
+                    llm=llm_openai,
                     toolkit=toolkit,
                     verbose=True,
                     suffix=os.environ['SQL_AGENT_PROMPT_SUFFIX'],

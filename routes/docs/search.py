@@ -6,17 +6,13 @@ from langchain_core.prompts import ChatPromptTemplate
 
 import numpy as np
 import os
-
+from routes.llm_connections import llm_openai
 from config import Config
 from routes.docs.embeddings import get_embeddings
 from routes.docs.index_search_client import get_index_client
 
-# llm = ChatGroq(model="llama3-70b-8192", temperature=0)
-llm = ChatOpenAI(temperature=0, model_name="gpt-4o")
-# llm = AzureChatOpenAI(
-#     azure_deployment=os.environ['AZURE_OPENAI_CHAT_DEPLOYMENT_NAME'],
-#     openai_api_version=os.environ['AZURE_OPENAI_API_VERSION']
-# )
+llm = llm_openai
+llm.temperature = 0
 
 def get_top_k_results(project_id, query):
     """

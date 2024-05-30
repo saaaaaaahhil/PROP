@@ -72,9 +72,7 @@ async def upload_data(
         return {'success': True}        
     except Exception as e:
         print(f"Exception occurred: {e}")
-        raise
-        return JSONResponse(status_code=500, content={"message": f'Error uploading file {file.filename} to {project_id} database: {e}'})
-
+        return {'success': False, 'failure': f'Failed to upload csv/xlsx data: {e}'}
 
 # have optional str parameters model and agent_type
 @router.post('/run_sql_query_test')
@@ -128,7 +126,6 @@ async def delete_data(
             return {'success': True}
 
     except Exception as e:
-            raise
-            return JSONResponse(status_code=500, content={"message": f'Error deleting file {file_id} from {project_id} database: {e}'})
+            return {'success': False, 'failure': f'Failed to delete the file: {e}'}
 
 

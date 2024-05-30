@@ -1,5 +1,5 @@
 import uvicorn
-from fastapi import FastAPI, Form, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, Form, UploadFile, File, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 import routes.csv.csv_router as csv_router
@@ -10,6 +10,7 @@ import routes.docs.docs_router as docs_router
 import routes.images.images_router as images_router
 import routes.metadata.metadata_router as metadata_router
 import routes.query_router.router as query_router
+import metadata_extractor.metadata_extractor_router as metadata_extractor_router
 from routes.pitch.generate_pitch import generate_pitch
 import redis
 from config import Config
@@ -29,6 +30,7 @@ app.include_router(docs_router.router)
 app.include_router(images_router.router)
 app.include_router(metadata_router.router)
 app.include_router(query_router.router)
+app.include_router(metadata_extractor_router.router)
 
 
 @app.get('/')
@@ -52,10 +54,13 @@ project_id: str = Form(...)):
             return JSONResponse(status_code=200, content={"message": f'Files retrieved successfully from {project_id} database.',  'response_time': f'{process_time}s', "result": response['answer']})
 
         else:
-            return JSONResponse(status_code=500, content={"message": f'Error retrieving data for project {project_id}.', 'response_time': f'{process_time}s'})
+            raise Exception(response['failure'])
+        
     except Exception as e:
         process_time = round(time.time() - start_time, 2)
-        return JSONResponse(status_code=500, content={"message": f'Error retrieving data from {project_id} database: {e}', 'response_time': f'{process_time}s'})
+        return JSONResponse(status_code=500, content={
+        "message": f'Sorry but there was an error while processing your request: {e}', 
+        'response_time': f'{process_time}s'})
 
 
 @app.post('/upload_file')
@@ -67,29 +72,50 @@ async def upload_file(
     This function takes the project_id and file to be uploaded.
     """
     
-    #Generate a unique id for file
+    # Generate a unique id for file
     id = str(uuid.uuid4())
     start_time = time.time()
     try:
         print(f'Uploading file {file.filename} to {project_id} database.')
 
-        #Check if file type is supported
+        # Check if file type is supported
         file_extension = file.filename.split('.')[-1].lower()
         if file_extension not in ["csv", "pdf", "jpg", "jpeg", "png", "xlsx", "docx"]:
-            return JSONResponse(status_code=400, content={"message": f'Invalid file format: {file_extension}.', 'response_time': f'{round(time.time()-start_time,2)}s'})
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "message": f'Invalid file format: {file_extension}.',
+                    'response_time': f'{round(time.time() - start_time, 2)}s'
+                }
+            )
         
         # Check if file already exists for given project
         check = check_file_exist({'file_name': file.filename, 'project_id': project_id})
         if check is not None:
             if check['status'] == 'success':
-                print("File already exists in database !")
-                return JSONResponse(status_code=400, content={"message": f'File {file.filename} already exists in database.', 'response_time': f'{round(time.time()-start_time,2)}s'})
+                print("File already exists in database!")
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "message": f'File {file.filename} already exists in database.',
+                        'response_time': f'{round(time.time() - start_time, 2)}s'
+                    }
+                )
             else:
                 id = check['_id']
 
-        #Update file upload status to 'in_progress'
+        # Update file upload status to 'in_progress'
         query = {"_id": id, 'project_id': project_id}
-        update = {"$set": {'file_name': file.filename, 'file_type': file_extension, 'file_size': f'{0} KB' , "added_on": datetime.now().isoformat(),'chunks' : [], 'status' : 'in_progress'}}
+        update = {
+            "$set": {
+                'file_name': file.filename,
+                'file_type': file_extension,
+                'file_size': f'{0} KB',
+                "added_on": datetime.now().isoformat(),
+                'chunks': [],
+                'status': 'in_progress'
+            }
+        }
         update_mongo_file_status(query, update, True)
   
         upload_routes = {
@@ -98,20 +124,32 @@ async def upload_file(
             'pdf': upload_doc,
             'jpg': upload_image,
             'jpeg': upload_image,
-            'png' : upload_image,
+            'png': upload_image,
             'docx': upload_doc
         }
 
         response = await upload_routes[file_extension](background_tasks, file, project_id, id)
         if response['success']:
-            return JSONResponse(status_code=200, content={"message": f'File {file.filename} uploaded successfully to {project_id} database.', 'response_time': f'{round(time.time()-start_time,2)}s'})
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "message": f'File {file.filename} uploaded successfully to {project_id} database.',
+                    'response_time': f'{round(time.time() - start_time, 2)}s'
+                }
+            )
         else:
-            raise
-    
+            raise Exception(response['failure'])
     except Exception as e:
+        print(f"Error uploading file: {e}")
         # Update file upload status to 'fail' in case of failure
-        update_mongo_file_status({"_id": id, 'project_id': project_id}, {'$set' : {'status': 'fail'}}, True)
-        return JSONResponse(status_code=500, content={"message": f'Error uploading file {file.filename} to {project_id} database: {e}', 'response_time': f'{round(time.time()-start_time,2)}s'})
+        update_mongo_file_status({"_id": id, 'project_id': project_id},{'$set': {'status': 'fail'}},True)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "message": f'Sorry but there was an error while processing your request: {e}',
+                'response_time': f'{round(time.time() - start_time, 2)}s'
+            }
+        )
 
     
 @app.post('/delete_file')
@@ -127,41 +165,56 @@ async def delete_file(
         print(f'Deleting file {file_id} from {project_id} database.')
 
         # Check if file exists for given project_id.
-        file = check_file_exist({'_id': file_id, 'project_id': project_id},{'file_type': 1})
+        file = check_file_exist({'_id': file_id, 'project_id': project_id}, {'file_type': 1})
         if file is None:
-            return JSONResponse(status_code=400, content={"message": "Incorrect file_id.", 'response_time': f'{round(time.time()-start_time,2)}s'})
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "message": "Incorrect file_id.",
+                    'response_time': f'{round(time.time() - start_time, 2)}s'
+                }
+            )
 
         delete_routes = {
-            'xlsx' : delete_data,
-            'csv'  : delete_data,
-            'pdf'  : delete_doc,
-            'jpeg' : delete_image,
-            'jpg'  : delete_image,
-            'png'  : delete_image,
-            'docx' : delete_doc
+            'xlsx': delete_data,
+            'csv': delete_data,
+            'pdf': delete_doc,
+            'jpeg': delete_image,
+            'jpg': delete_image,
+            'png': delete_image,
+            'docx': delete_doc
         }
         
-        #Update file delete status to 'deleting'.
+        # Update file delete status to 'deleting'.
         query = {'_id': file_id, 'project_id': project_id}
-        update = {"$set" : {'status': 'deleting'}}
+        update = {"$set": {'status': 'deleting'}}
         update_mongo_file_status(query, update, False)
 
         response = await delete_routes[file['file_type']](background_tasks, project_id, file_id)
         if response['success']:
-            return JSONResponse(status_code=200, content={"message": f'File {file_id} deleted successfully from {project_id} database.', 'response_time': f'{round(time.time()-start_time,2)}s'})
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "message": f'File {file_id} deleted successfully from {project_id} database.',
+                    'response_time': f'{round(time.time() - start_time, 2)}s'
+                }
+            )
         else:
-            raise
-
+            raise Exception(response.get('failure', 'Unknown error'))
     except Exception as e:
         print(f"Error deleting file: {e}")
         # Restore file delete status to 'success' in case of failure
-        update_mongo_file_status({'_id': file_id, 'project_id': project_id}, {"$set" : {'status': 'success'}}, False)
-        return JSONResponse(status_code=500, content={"message": f'Error deleting the file: {file_id}', 'response_time': f'{round(time.time()-start_time,2)}s'})
-
+        update_mongo_file_status({'_id': file_id, 'project_id': project_id}, {"$set": {'status': 'success'}}, False)
+        return JSONResponse(
+            status_code=500,
+            content={
+            'message': f"Sorry but there was an error while processing your request:{str(e)}",
+            'response_time': f'{round(time.time() - start_time, 2)}s'
+        })
 
 @app.post('/pitch_query', tags=['pitch_query'])
 async def run_pitch_query(
-    project_id : str = Form(...),
+    project_id: str = Form(...),
     query: str = Form(...)):
     """
     This function takes project_id and query and generates a pitch.
@@ -169,15 +222,28 @@ async def run_pitch_query(
     start_time = time.time()
     try:
         print('Generating pitch from query')
-
         response = await generate_pitch(project_id, query)
 
         if response['success']:
-            return JSONResponse(status_code=200, content={'message': 'Pitch generated successfully', 'response_time': f'{round(time.time()-start_time,2)}s', 'result': response['answer']})
+            return JSONResponse(
+                status_code=200,
+                content={
+                    'message': 'Pitch generated successfully',
+                    'response_time': f'{round(time.time() - start_time, 2)}s',
+                    'result': response['answer']
+                }
+            )
         else:
-            raise
+            raise Exception(response['failure'])
+
     except Exception as e:
-        return JSONResponse(status_code=500, content={'message': f'Error generating pitch: {e}', 'response_time': f'{round(time.time()-start_time,2)}s'})
+        print(f"Error generating pitch: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+            'message':f"Sorry but there was an error while processing your request: {e}",
+            'response_time': f'{round(time.time() - start_time, 2)}s'}
+        )
 
 if __name__ == '__main__':
     uvicorn.run('main:app', host='0.0.0.0', port=8000)

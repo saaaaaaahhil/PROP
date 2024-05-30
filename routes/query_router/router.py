@@ -11,15 +11,11 @@ from routes.metadata.run_md_query import run_md_query
 from routes.docs.search import run_rag_pipeline
 from routes.images.image_agent import query_images
 # from connections.redis import llmcache
-from groq import Groq
 import os
+from routes.llm_connections import groq_client
 
 
 router = APIRouter(prefix='/run_user_query', tags=['final_query'])
-
-client = Groq(api_key=os.environ['GROQ_API_KEY'])
-MODEL = 'llama3-70b-8192'
-
 
 @router.post('/query')
 async def run_user_query(

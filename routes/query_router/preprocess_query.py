@@ -4,22 +4,15 @@ from groq import Groq
 import json
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from config import Config
-
+from routes.metadata.metadata_agent import llm
+from routes.llm_connections import groq_client
 from routes.exceptions import RetryableException
+from strictjson import *
 
 # Retry configuration
-RETRY_WAIT = wait_exponential(multiplier=Config.RETRY_MULTIPLIER, min=Config.RETRY_MIN, max=Config.RETRY_MAX)
-RETRY_ATTEMPTS = Config.RETRY_ATTEMPTS
+RETRY_WAIT = wait_exponential(multiplier=int(Config.RETRY_MULTIPLIER), min=int(Config.RETRY_MIN), max=int(Config.RETRY_MAX))
+RETRY_ATTEMPTS = int(Config.RETRY_ATTEMPTS)
 
-# client = AzureOpenAI(
-#     api_key=os.environ['AZURE_OPENAI_API_KEY'],  
-#     api_version=os.environ['AZURE_OPENAI_API_VERSION'],
-#     azure_endpoint=os.environ['AZURE_OPENAI_ENDPOINT']
-# )
-# client = OpenAI()
-client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY"),
-)
 
 system_prompt_multiquery = """Analyze the given query and classify it into one of the following categories: \
   - 'metadata' if the query is related to location, connectivity (roads, metro/MRT) & social infrastructure near the project. \
@@ -35,7 +28,7 @@ system_prompt_multiquery = """Analyze the given query and classify it into one o
     3. Presence of specific rooms or spaces in a unit type - eg, does the 2 bed unit have balcony/study room/helper room/servant quarters/house shelter? \
     4. Mapping unit type to blocks or towers within a project - eg, which blocks/tower have 2 bed + study unit? \
     5. Area of a specific unit type - eg, what is the area of 2 Bed unit? \
-  - 'csv' if the query is associated with a specific unit number.  \
+  - 'csv' if the query is associated with a specific unit number details.  \
     Some example queries: \
     1. What is the price of unit 123? \
     2. What is the view of unit 123? Is it unsold? \
@@ -65,10 +58,10 @@ system_prompt_multiquery = """Analyze the given query and classify it into one o
     3. What’s the ceiling height in the bathrooms? \
     4. Are there any energy-efficient features in the building design? \
   - 'other' if the query does not fall into either of the previous categories. \
-  If the input from user contains more than one query(i.e. composite query), that should be separated into individual queries for classification, separate and process each query independently. \
-  For example: How many units have price less than 2M, are unsold and have a pool view and which are the nearby schools to the property? \
+  If the input from user contains more than one query(i.e. composite query), that should be separated into individual queries, that are self-sufficient and include enough context to be understood independently, for classification. \
   Respond with a list of JSON objects in the following format \
-  Output: 
+  Example 1: How many units have price less than 2M, are unsold and have a pool view and which are the nearby schools to the property?  \
+  Output 1: 
   {
     'result': [
       {
@@ -80,7 +73,21 @@ system_prompt_multiquery = """Analyze the given query and classify it into one o
         "category": "metadata"
       }
     ]
-  } 
+  }
+  Example 2: What is the price of unit 123? Is it unsold? \
+  Output 2:
+  {
+    'result': [
+      {
+        "query": "What is the price of unit 123?",
+        "category": "csv"
+      },
+      {
+        "query": "Is unit 123 unsold?",
+        "category": "csv"
+      }
+    ]
+  }
   Do not provide any explanation or additional information in your response."""
 
 
@@ -161,37 +168,119 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
   
   Do not provide any explanation or additional information in your response."""
 
+system_prompt_breakdown = """
+Analyze the given query and break it down into granular, self-sufficient queries. Each query should be independently understandable and include enough context. Make sure to combine closely related parts of the query if it makes sense for clarity and context. If a query naturally combines closely related parts, keep them together for clarity and context.
+
+For example:
+1. Composite Query: "What is the price of unit 208? Is it unsold?"
+   Output: 
+   {
+     "result": ["What is the price of unit 208?", "Is unit 208 unsold?"]
+   }
+
+2. Composite Query: "How many units have price less than 2M, are unsold and have a pool view and which are the nearby schools to the property?"
+   Output:
+   {
+     "result": ["How many units have price less than 2M, are unsold and have a pool view?", "Which are the nearby schools to the property?"]
+   }
+
+3. Composite Query: "which are the nearby schools to the property? which of these are nearest?"
+   Output:
+   {
+     "result": ["Which are the nearby schools to the property?", "Which of these schools are nearest to the property?"]
+   }
+   
+4. Composite Query: "Which blocks are 1 Bed + study units located in tembusu grand?"
+   Output:
+   {
+     "result": ["Which blocks have 1 Bed + study units in Tembusu Grand?"]
+   }
+
+
+Respond with a list of JSON objects in the following format:
+{
+  "result": [<granular_query1>, <granular_query2>, ...]
+}
+"""
+
 @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
+def classify_queries(queries: list):
+    try:
+        # response = client.chat.completions.create(
+        #     # model="gpt-3.5-turbo",
+        #     model="llama3-70b-8192",
+
+        #     messages=[
+        #         {"role": "system", "content": system_prompt_singlequery},
+        #         {"role": "user", "content": str(queries)}
+        #     ],
+        #     max_tokens=4096,
+        #     temperature=0.5,
+        #     response_format={"type": "json_object"}
+        # )
+
+        # content = response.choices[0].message.content
+        # json_object = json.loads(content)
+        # print(json_object)
+        # return json_object['result']
+        print(queries)
+        res = strict_json(system_prompt = system_prompt_singlequery,
+                    user_prompt = str(queries),
+                    output_format ={
+                                    "result": 'List of query objects'
+                                  },
+                    llm = llm)
+        print(res)
+        
+        return res['result']
+    except Exception as e:
+        print(f"Error classifying queries: {e}")
+        raise RetryableException(f"Error classifying queries: {e}")
+
+
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
+def preprocess_composite_query(query: str):
+    try:
+        # response = client.chat.completions.create(
+        #     # model="gpt-3.5-turbo",
+        #     model="llama3-70b-8192",
+        #     messages=[
+        #         {"role": "system", "content": system_prompt_breakdown},
+        #         {"role": "user", "content": query}
+        #     ],
+        #     max_tokens=4096,
+        #     temperature=0.5,
+        #     response_format={"type": "json_object"}
+        # )
+
+        # content = response.choices[0].message.content
+        # json_object = json.loads(content)
+        # print(json_object)
+        # return json_object['result']
+        res = strict_json(system_prompt = system_prompt_breakdown,
+                    user_prompt = query,
+                    output_format = {
+                                      'result': 'List of queries'
+                                    },
+                    llm = llm)
+        print(res)
+        return res['result']
+
+    except Exception as e:
+        print(f"Error breaking down query: {e}")
+        raise RetryableException(f"Error preprocessing query: {e}")
+
 def preprocess_query(query: str):
     """
     This function classifies the query into one of the relevant categories(also breaking the query into granular queries if needed).
     """
     try:
-        response = client.chat.completions.create(
-            # model=os.environ['AZURE_OPENAI_CHAT_DEPLOYMENT_NAME'],
-            # model="gpt-4o",
-            model="llama3-70b-8192",
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt_multiquery
-                },
-                {
-                    "role": "user",
-                    "content": query
-                }
-            ],
-            max_tokens=4096,
-            temperature=0.5,
-            response_format={"type": "json_object"}
-        )
-
-        content = response.choices[0].message.content
-        # print(content)
-        json_object = json.loads(content)
-        print(json_object)
-        # return content
-        return json_object['result']        
+        queries = preprocess_composite_query(query)
+        if queries:
+            classified_queries = classify_queries(queries)
+            return classified_queries
+        else:
+            return []       
 
     except Exception as e:
         print(f"Error preprocessing query: {e}")
@@ -231,9 +320,4 @@ def aggregate_queries(queries: list):
         aggregated_queries.append({'query': combined_vision_query, 'category': 'vision'})
     print(aggregated_queries)
     return aggregated_queries
-       
-      
-         
-
-    
-            
+        

@@ -1,16 +1,8 @@
 from fastapi import APIRouter
 from fastapi import UploadFile, File, Form
 from fastapi.responses import JSONResponse
-
-import asyncio
 from starlette.concurrency import run_in_threadpool
-
 from fastapi import BackgroundTasks
-
-import PyPDF2
-import logging
-from io import BytesIO
-from config import Config
 from routes.docs.store_operations import upload_document_to_index, delete_doc_data
 from routes.docs.search import run_rag_pipeline
 
@@ -36,9 +28,7 @@ async def upload_doc(
         return {'success': True}
     except Exception as e:
         print(f'Error uploading file: {e}')
-        raise
-        return JSONResponse(status_code=500, content={"message": f'Error uploading file.'})
-        
+        return {'success': True, 'failure': f'Failed to upload docx/pdf data: {e}'}
     
 @router.post('/run_doc_query')
 async def run_doc_query(
@@ -71,6 +61,4 @@ async def delete_doc(
         return {'success': True}
     except Exception as e:
         print(f"Error deleting file: {e}")
-        raise
-        return JSONResponse(status_code=500, content={"message": f'Error deleting file.'})
-    
+        return {'success': False, 'failure': f'Failure in deleting doc: {e}'}
