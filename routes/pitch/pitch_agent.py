@@ -1,4 +1,3 @@
-from groq import Groq
 from routes.llm_connections import openai_client
 import json
 from openai import AzureOpenAI, OpenAI

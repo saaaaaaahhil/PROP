@@ -124,10 +124,11 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
     1. Can you show me the floor plan of the 2 bed unit? \
     2. Can you show me the master plan? \
     3. Can you show me the site map? \
-  - 'general' if query is related to rules and regulations, taxes and other standard operating procedures  \
-    Some example queries: \
-    1. What is the capital gains tax treatment for non-resident purchasers from Dubai? How are my rentals taxed?\
-    2. Broker A shared the lead of international customer Peter on 3rd Dec. Later broker B shared the same lead but with the customer in email loop on 10th Dec. Whom should the lead credit go to? (SOP's regarding sales)\
+    - 'general' if the query is related to rules and regulations, taxes, standard operating     procedures, warranty, or defect liability period.
+    Some example queries:
+    1. What is the capital gains tax treatment for non-resident purchasers from Dubai? How are my rentals taxed?
+    2. Broker A shared the lead of international customer Peter on 3rd Dec. Later broker B shared the same lead but with the customer in email loop on 10th Dec. Whom should the lead credit go to? (SOP's regarding sales)
+    3. What is the defect liability period?
   - 'docs' if the query is related to amenities, facilities, construction details, materials used, design specifics, or any other detailed documentation about the project. \
     Some example queries: \
     1. What are the amenities/facilities available in the project? \

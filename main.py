@@ -12,6 +12,7 @@ import routes.metadata.metadata_router as metadata_router
 import routes.query_router.router as query_router
 import metadata_extractor.metadata_extractor_router as metadata_extractor_router
 from routes.pitch.generate_pitch import generate_pitch
+from routes.pitch.generate_pitch2 import get_persona_from_query, get_pitch_from_persona
 import redis
 from config import Config
 import uuid
@@ -222,7 +223,10 @@ async def run_pitch_query(
     start_time = time.time()
     try:
         print('Generating pitch from query')
-        response = await generate_pitch(project_id, query)
+        # response = await generate_pitch(project_id, query)
+        persona  = await run_in_threadpool(get_persona_from_query, query)
+
+        response = await run_in_threadpool(get_pitch_from_persona, persona, project_id, query)
 
         if response['success']:
             return JSONResponse(

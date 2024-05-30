@@ -14,19 +14,10 @@ def upload_image_to_store(project_id, contents, file_name, file_type):
             return {"success" : False, "message" : f'File format for {file_name} not supported, please upload a JPEG or PNG image.'}
         
         print(f"Uploading file {file_name} to Azure Blob Storage {project_id}...")
-        # old_file_name = file_name
-        # # If the file is a PNG, convert it to JPEG
-        # if file_type == 'image/png':
-        #     image = Image.open(BytesIO(contents))
-        #     with BytesIO() as output:
-        #         image.convert("RGB").save(output, format="JPEG")
-        #         contents = output.getvalue()
-        #     file_name = file_name.rsplit('.', 1)[0] + '.jpeg'
-        #     file_type = 'image/jpeg'
 
+        #Calculate file size in KB
         file_size = len(contents) / 1024
 
-        
         container_client = get_container_client(project_id)
         container_client.upload_blob(name=file_name, data=contents, overwrite=True)
         print(f"File {file_name} uploaded successfully.")
