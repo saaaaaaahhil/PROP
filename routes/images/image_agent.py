@@ -1,8 +1,15 @@
 from routes.images.blob_storage_operations import get_image_urls
-from config import Config
 import os
 from routes.llm_connections import openai_client
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from config import Config
+from routes.exceptions import RetryableException
 
+# Retry configuration
+RETRY_WAIT = wait_exponential(multiplier=int(Config.RETRY_MULTIPLIER), min=int(Config.RETRY_MIN), max=int(Config.RETRY_MAX))
+RETRY_ATTEMPTS = int(Config.RETRY_ATTEMPTS)
+
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def query_images(project_id: str, query: str):
     """
     This function takes a query and returns a list of image URLs from Azure Blob Storage.

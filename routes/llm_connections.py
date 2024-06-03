@@ -49,3 +49,27 @@ def groq_llm(system_prompt: str, user_prompt: str, **kwargs):
     except Exception as e:
         print(f"Error generating response from groq: {e}")
         raise RetryableException(e)
+    
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
+def gpt_llm(system_prompt: str, user_prompt: str, **kwargs):
+    try:
+        # ensure your LLM imports are all within this function
+        from openai import OpenAI
+
+        # define your own LLM here
+        client = OpenAI()
+        MODEL = 'gpt-4o'
+
+
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            **kwargs
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"Error generating response from groq: {e}")
+        raise RetryableException(e)

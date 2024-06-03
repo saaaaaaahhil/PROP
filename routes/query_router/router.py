@@ -10,6 +10,7 @@ from routes.csv.sql_agent import run_query
 from routes.metadata.run_md_query import run_md_query
 from routes.docs.search import run_rag_pipeline
 from routes.images.image_agent import query_images
+from routes.images.return_image import return_image_from_store
 from routes.query_router.context_agent import get_context_aware_query
 # from connections.redis import llmcache
 import os
@@ -22,6 +23,7 @@ router = APIRouter(prefix='/run_user_query', tags=['final_query'])
 async def run_user_query(
     project_id: str = Form(...),
     chat_id: str = Form(None),
+    user_id: str = Form(None),
     query: str = Form(...)):
 
     start_time = time.time()
@@ -43,6 +45,8 @@ async def run_user_query(
             'vision': query_images,
             'general' : run_rag_pipeline,
             'general_csv': run_query,
+            'return_image': return_image_from_store,
+            'siteplan': query_images,
             'other': other_query
         }
 

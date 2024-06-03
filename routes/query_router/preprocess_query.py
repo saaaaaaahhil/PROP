@@ -97,7 +97,7 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
     2. How far is the project from the nearest metro station? \
     3. What are the nearby landmarks? \
     4. What is the air quality index around property? \
-  - 'vision' if answering the query would require access to a floor plan or master plan or unit plan. \
+  - 'vision' if answering the query would require access to a floor plan or master plan or unit plan.
     Some example queries: \
     1. Number of rooms \
     2. Size of rooms \
@@ -120,8 +120,9 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
     3. What are the options for 2-bedder units with monthly emi $3000 and a downpayment of $500000?\
   - 'return_image' if the query is related to returning an image or a floor plan or a master plan. \
     Some example queries: \
-    1. Can you show me the floor plan of the 2 bed unit? \
-    2. Can you show me the master plan? \
+    1. What is the plan for 2 bed units?
+    1. Show me the plan of the 2 bed unit? \
+    2. Give me the master plan \
     3. Can you show me the site map? \
     - 'general' if the query is related to rules and regulations, taxes, standard operating     procedures, warranty, or defect liability period.
     Some example queries:
@@ -139,6 +140,11 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
      1. What is the average price PSF (per square foot) of 2 beds in Grand duman project?
      2. What is the approx. rental values for 3 beds at cashew heights condo located near myst project?
      3. How many 1 beds have been sold at Continuum and what's the average transaction value?
+  - 'siteplan' if the query is concerned with the relative location of units or blocks within the project or requires the site plan to answer.
+    Some example queries:
+    1. Which block is closest to the entrance drop-off in the project?
+    2. Which units have the best view of the central garden?
+    3. Is unit 23 in tembusu grand a corner unit?
   - 'other' if the query does not fall into either of the previous categories. \
   
   Respond with a JSON object in the following format: 
@@ -170,6 +176,10 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
       },
       {
         "query": "<query>",
+        "category": "siteplan"
+      },
+      {
+        "query": "<query>",
         "category": "other"
       }
     ]
@@ -178,7 +188,7 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
   Do not provide any explanation or additional information in your response."""
 
 system_prompt_breakdown = """
-Analyze the given query and break it down into granular, self-sufficient queries only when necessary for understanding or completeness. Each query should be independently understandable and include enough context. Combine closely related parts of the query if it makes sense for clarity and context. Only break down queries if it makes sense to do so.
+Analyze the given query and break it down into granular, self-sufficient queries only when necessary for understanding or completeness. Each query should be independently understandable and include enough context. Combine closely related parts of the query if it makes sense for clarity and context. Only break down queries if it makes sense to do so. 
 
 For example:
 Composite Query: "What is the price of unit 208? Is it unsold?"
@@ -227,7 +237,7 @@ def classify_queries(queries: list):
         res = strict_json(system_prompt = system_prompt_singlequery,
                     user_prompt = str(queries),
                     output_format ={
-                                    'result': 'List of query objects'
+                                    "result": "List of query objects"
                                   },
                     llm = groq_llm,
                     chat_args = { "max_tokens": 4096, 'temperature': 0.5})
