@@ -4,8 +4,7 @@ from groq import Groq
 import json
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from config import Config
-from routes.metadata.metadata_agent import llm
-from routes.llm_connections import groq_client
+from routes.llm_connections import groq_llm, openai_client
 from routes.exceptions import RetryableException
 from strictjson import *
 
@@ -133,8 +132,13 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
     Some example queries: \
     1. What are the amenities/facilities available in the project? \
     2. What is the material used in the kitchen? \
-    3. What’s the ceiling height in the bathrooms? \
+    3. What's the ceiling height in the bathrooms? \
     4. Are there any energy-efficient features in the building design? \
+  - 'general_csv' if the query is regarding extracting detailed real estate market information and performing financial analysis to support investment decisions, market analysis, and property management.
+    Some example queries are:
+     1. What is the average price PSF (per square foot) of 2 beds in Grand duman project?
+     2. What is the approx. rental values for 3 beds at cashew heights condo located near myst project?
+     3. How many 1 beds have been sold at Continuum and what's the average transaction value?
   - 'other' if the query does not fall into either of the previous categories. \
   
   Respond with a JSON object in the following format: 
@@ -162,6 +166,10 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
       },
       {
         "query": "<query>",
+        "category": "general_csv"
+      },
+      {
+        "query": "<query>",
         "category": "other"
       }
     ]
@@ -170,33 +178,24 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
   Do not provide any explanation or additional information in your response."""
 
 system_prompt_breakdown = """
-Analyze the given query and break it down into granular, self-sufficient queries. Each query should be independently understandable and include enough context. Make sure to combine closely related parts of the query if it makes sense for clarity and context. If a query naturally combines closely related parts, keep them together for clarity and context.
+Analyze the given query and break it down into granular, self-sufficient queries only when necessary for understanding or completeness. Each query should be independently understandable and include enough context. Combine closely related parts of the query if it makes sense for clarity and context. Only break down queries if it makes sense to do so.
 
 For example:
-1. Composite Query: "What is the price of unit 208? Is it unsold?"
-   Output: 
-   {
-     "result": ["What is the price of unit 208?", "Is unit 208 unsold?"]
-   }
+Composite Query: "What is the price of unit 208? Is it unsold?"
+Output: {"result": ["What is the price of unit 208?", "Is unit 208 unsold?"]}
+Thought process: This query naturally splits into two distinct questions that provide complete and clear information independently.
 
-2. Composite Query: "How many units have price less than 2M, are unsold and have a pool view and which are the nearby schools to the property?"
-   Output:
-   {
-     "result": ["How many units have price less than 2M, are unsold and have a pool view?", "Which are the nearby schools to the property?"]
-   }
+Composite Query: "How many units have price less than 2M, are unsold and have a pool view and which are the nearby schools to the property?"
+Output: {"result": ["How many units have price less than 2M, are unsold and have a pool view?", "Which are the nearby schools to the property?"]}
+Thought process: The query contains two separate aspects: one about the units and another about nearby schools. Splitting them ensures clarity.
 
-3. Composite Query: "which are the nearby schools to the property? which of these are nearest?"
-   Output:
-   {
-     "result": ["Which are the nearby schools to the property?", "Which of these schools are nearest to the property?"]
-   }
-   
-4. Composite Query: "Which blocks are 1 Bed + study units located in tembusu grand?"
-   Output:
-   {
-     "result": ["Which blocks have 1 Bed + study units in Tembusu Grand?"]
-   }
+Composite Query: "What is the approx. rental values for 3 beds at cashew heights condo located near myst project?"
+Output: {"result": ["What is the approx. rental values for 3 beds at cashew heights condo located near myst project?"]}
+Thought process: This query is already clear, self-sufficient and complete, providing specific information about rental values at a particular location.
 
+Composite Query: "Which blocks are 1 Bed + study units located in tembusu grand?"
+Output: {"result": ["Which blocks have 1 Bed + study units in Tembusu Grand?"]}
+Thought process: This query is straightforward and specific, needing no further breakdown for clarity.
 
 Respond with a list of JSON objects in the following format:
 {
@@ -228,9 +227,10 @@ def classify_queries(queries: list):
         res = strict_json(system_prompt = system_prompt_singlequery,
                     user_prompt = str(queries),
                     output_format ={
-                                    "result": 'List of query objects'
+                                    'result': 'List of query objects'
                                   },
-                    llm = llm)
+                    llm = groq_llm,
+                    chat_args = { "max_tokens": 4096, 'temperature': 0.5})
         print(res)
         
         return res['result']
@@ -242,15 +242,15 @@ def classify_queries(queries: list):
 @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def preprocess_composite_query(query: str):
     try:
-        # response = client.chat.completions.create(
-        #     # model="gpt-3.5-turbo",
-        #     model="llama3-70b-8192",
+        # response = openai_client.chat.completions.create(
+        #     model="gpt-3.5-turbo",
+        #     # model="llama3-70b-8192",
         #     messages=[
         #         {"role": "system", "content": system_prompt_breakdown},
         #         {"role": "user", "content": query}
         #     ],
         #     max_tokens=4096,
-        #     temperature=0.5,
+        #     temperature=0,
         #     response_format={"type": "json_object"}
         # )
 
@@ -263,7 +263,8 @@ def preprocess_composite_query(query: str):
                     output_format = {
                                       'result': 'List of queries'
                                     },
-                    llm = llm)
+                    llm = groq_llm,
+                    chat_args = { "max_tokens": 4096, 'temperature': 0})
         print(res)
         return res['result']
 

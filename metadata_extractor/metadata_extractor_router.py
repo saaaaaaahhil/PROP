@@ -12,11 +12,12 @@ from routes.mongo_db_functions import insert_metadata_to_db
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 import time
+from starlette.concurrency import run_in_threadpool
 
 router = APIRouter(prefix='/metadata', tags=['LOCATION_METADATA'])
 
 @router.post('/extract_metadata')
-def extract_metadata(address : str, radius : int, project_id : str):
+async def extract_metadata(address : str, radius : int, project_id : str):
     """
     This function extracts the location metadata and stores it in database.
     """
@@ -71,7 +72,7 @@ def extract_metadata(address : str, radius : int, project_id : str):
         # vicinity_map_list.append(vicinity_map)
 
         print(f"Database instance")
-        insert_metadata_to_db(vicinity_map=vicinity_map)
+        await run_in_threadpool(insert_metadata_to_db, vicinity_map=vicinity_map)
         print(f"Data generation completed successfully")
 
         return JSONResponse(status_code=200, content={'message': 'Data uploaded successfully', 'response_time': f'{round(time.time()-start_time,2)}s'})

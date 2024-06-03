@@ -1,7 +1,9 @@
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from connections.mongo_db import file_collection, meta_collection
+from connections.mongo_db import file_collection, meta_collection, chat_collection
 from config import Config
 from routes.exceptions import RetryableException
+import os
+from bson import ObjectId
 
 # Retry configuration
 RETRY_WAIT = wait_exponential(multiplier=int(Config.RETRY_MULTIPLIER), min=int(Config.RETRY_MIN), max=int(Config.RETRY_MAX))
@@ -130,4 +132,22 @@ def insert_metadata_to_db(vicinity_map):
         print(f'Error uploading metadata: {e}')
         raise RetryableException(f'Error uploading location metadata into mongodb: {e}')
 
-        
+
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
+def get_chat_history(chat_id: str):
+    """
+    This method retrieves last 3 chat messages from the database
+    """
+    try:
+        print(f'Getting chat history for chat_id: {chat_id}')
+        object_id = ObjectId(chat_id)
+        messages = []
+        context_length = int(os.environ['MONGO_CONTEXT_LENGTH'])
+        message_history = chat_collection.find_one({'_id':object_id}, {"messages": {"$slice":context_length }})
+        if message_history is not None:
+            for message in message_history['messages']:
+                messages.append({'text': message['text'], 'role': message['role']})
+
+        return messages
+    except Exception as e:
+        print(f'Error retrieving message history: {e}')

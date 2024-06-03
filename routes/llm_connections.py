@@ -3,6 +3,13 @@ from openai import OpenAI, AzureOpenAI
 import os
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_groq import ChatGroq
+from routes.exceptions import RetryableException
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from config import Config
+
+# Retry configuration
+RETRY_WAIT = wait_exponential(multiplier=int(Config.RETRY_MULTIPLIER), min=int(Config.RETRY_MIN), max=int(Config.RETRY_MAX))
+RETRY_ATTEMPTS = int(Config.RETRY_ATTEMPTS)
 
 try:
     groq_client = Groq(api_key=os.environ['GROQ_API_KEY'])
@@ -18,3 +25,27 @@ try:
 
 except Exception as e:
     print(f"Error connecting to client: {e}")
+
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
+def groq_llm(system_prompt: str, user_prompt: str, **kwargs):
+    try:
+        # ensure your LLM imports are all within this function
+        from groq import Groq
+
+        # define your own LLM here
+        client = Groq(api_key=os.environ['GROQ_API_KEY'])
+        MODEL = 'llama3-70b-8192'
+
+
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            **kwargs
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"Error generating response from groq: {e}")
+        raise RetryableException(e)

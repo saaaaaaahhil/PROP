@@ -7,6 +7,7 @@ try:
     file_collection = db[str(Config.MONGO_FILE_COLLECTION)]
     meta_collection = db[str(Config.MONGO_META_COLLECTION)]
     # project_collection = db[str(Config.MONGO_PROJECT_COLLECTION)]
+    chat_collection = db[str(Config.MONGO_CHAT_COLLECTION)]
 except Exception as e:
     print(f"MongoDB connection unsuccessfull: {e}")
     raise

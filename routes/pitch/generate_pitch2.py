@@ -1,11 +1,10 @@
-from groq import Groq
-from openai import OpenAI
 from routes.metadata.run_md_query import run_md_query as get_location
 from routes.docs.search import run_rag_pipeline as get_information
 import os
 from strictjson import *
 from routes.llm_connections import openai_client
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
+from routes.llm_connections import groq_llm
 
 
 def get_persona_from_query(query: str):
@@ -22,7 +21,7 @@ def get_persona_from_query(query: str):
                     output_format ={
                                     'persona' : 'persona of customer'
                                 },
-                    llm = llm)
+                    llm = groq_llm)
     
 
     persona = res['persona']
@@ -158,26 +157,3 @@ def get_pitch_from_persona(persona : dict, project_id: str, user_query: str):
         return {'success': True, 'answer': pitch}
     except Exception as e:
         return {'success': False, 'failure': e}
-
-def llm(system_prompt: str, user_prompt: str):
-    # ensure your LLM imports are all within this function
-    from groq import Groq
-
-    # define your own LLM here
-    client = Groq(api_key=os.environ['GROQ_API_KEY'])
-    MODEL = 'llama3-70b-8192'
-
-    response = client.chat.completions.create(
-        model=MODEL,
-        temperature=0.5,
-        max_tokens=1024,
-        top_p=1,
-        stream=False,
-        response_format={"type": "json_object"},
-        stop=None,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-    )
-    return response.choices[0].message.content

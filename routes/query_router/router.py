@@ -10,6 +10,7 @@ from routes.csv.sql_agent import run_query
 from routes.metadata.run_md_query import run_md_query
 from routes.docs.search import run_rag_pipeline
 from routes.images.image_agent import query_images
+from routes.query_router.context_agent import get_context_aware_query
 # from connections.redis import llmcache
 import os
 from routes.llm_connections import groq_client
@@ -20,11 +21,19 @@ router = APIRouter(prefix='/run_user_query', tags=['final_query'])
 @router.post('/query')
 async def run_user_query(
     project_id: str = Form(...),
+    chat_id: str = Form(None),
     query: str = Form(...)):
+
     start_time = time.time()
     try:
+        if not(chat_id is None):
+            #Get context aware query
+            context_query = await run_in_threadpool(get_context_aware_query, chat_id, project_id, query)
+        else:
+            context_query = query
+
         #Get categories of queries through classifier
-        response = await run_in_threadpool(preprocess_query, query)
+        response = await run_in_threadpool(preprocess_query, context_query)
 
         # Mapping of functions and category
         category_functions = {
@@ -33,6 +42,7 @@ async def run_user_query(
             'docs': run_rag_pipeline,
             'vision': query_images,
             'general' : run_rag_pipeline,
+            'general_csv': run_query,
             'other': other_query
         }
 
@@ -58,6 +68,11 @@ def other_query(project_id: str, query: str):
 def execute_single_query(response: dict, category_functions: dict, project_id: str):
     try:
         category = response['category']
+
+        if category == 'general':
+            project_id = 'general'
+        elif category == 'general_csv':
+            project_id = 'market'
 
         # Check if query category is valid
         if category not in category_functions:
@@ -100,6 +115,8 @@ def execute_queries_parallel(category_functions: dict, project_id: str, response
                 # else:
                 if category == 'general':
                     future = executor.submit(category_functions[category], 'general', query)
+                elif category == 'general_csv':
+                    future = executor.submit(category_functions[category], 'market', query)
                 else:
                     future = executor.submit(category_functions[category], project_id, query)
                     

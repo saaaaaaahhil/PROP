@@ -91,7 +91,7 @@ async def upload_file(
             )
         
         # Check if file already exists for given project
-        check = check_file_exist({'file_name': file.filename, 'project_id': project_id})
+        check = await run_in_threadpool(check_file_exist, {'file_name': file.filename, 'project_id': project_id})
         if check is not None:
             if check['status'] == 'success':
                 print("File already exists in database!")
@@ -117,7 +117,8 @@ async def upload_file(
                 'status': 'in_progress'
             }
         }
-        update_mongo_file_status(query, update, True)
+
+        await run_in_threadpool(update_mongo_file_status, query, update, True)
   
         upload_routes = {
             'xlsx': upload_data,
@@ -143,7 +144,7 @@ async def upload_file(
     except Exception as e:
         print(f"Error uploading file: {e}")
         # Update file upload status to 'fail' in case of failure
-        update_mongo_file_status({"_id": id, 'project_id': project_id},{'$set': {'status': 'fail'}},True)
+        await run_in_threadpool(update_mongo_file_status, {"_id": id, 'project_id': project_id}, {'$set': {'status': 'fail'}}, True)
         return JSONResponse(
             status_code=500,
             content={
@@ -166,7 +167,7 @@ async def delete_file(
         print(f'Deleting file {file_id} from {project_id} database.')
 
         # Check if file exists for given project_id.
-        file = check_file_exist({'_id': file_id, 'project_id': project_id}, {'file_type': 1})
+        file = await run_in_threadpool(check_file_exist, {'_id': file_id, 'project_id': project_id}, {'file_type': 1})
         if file is None:
             return JSONResponse(
                 status_code=400,
@@ -189,7 +190,7 @@ async def delete_file(
         # Update file delete status to 'deleting'.
         query = {'_id': file_id, 'project_id': project_id}
         update = {"$set": {'status': 'deleting'}}
-        update_mongo_file_status(query, update, False)
+        await run_in_threadpool(update_mongo_file_status, query, update, False)
 
         response = await delete_routes[file['file_type']](background_tasks, project_id, file_id)
         if response['success']:
@@ -205,7 +206,7 @@ async def delete_file(
     except Exception as e:
         print(f"Error deleting file: {e}")
         # Restore file delete status to 'success' in case of failure
-        update_mongo_file_status({'_id': file_id, 'project_id': project_id}, {"$set": {'status': 'success'}}, False)
+        await run_in_threadpool(update_mongo_file_status, {'_id': file_id, 'project_id': project_id}, {"$set": {'status': 'success'}}, False)
         return JSONResponse(
             status_code=500,
             content={

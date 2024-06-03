@@ -1,12 +1,9 @@
-from groq import Groq
-from openai import OpenAI
 import os
 import json
 from config import Config
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-
 from strictjson import *
-from routes.llm_connections import groq_client
+from routes.llm_connections import groq_client, groq_llm
 from routes.exceptions import RetryableException
 
 # Retry configuration
@@ -90,7 +87,8 @@ def get_query_response(data: str, user_query: str):
                     user_prompt = encoded_query,
                     output_format ={
                                     "answer": "## Key Information\n- **AQI:** 42\n- **Nearest Hospital:** XYZ Hospital\n- **Distance to Landmark:** 2.5 km\n\n`No results found!`"},
-                    llm = llm)
+                    llm = groq_llm,
+                    chat_args={'temperature': 1, 'max_tokens':1024, 'top_p': 1})
         
         return res['answer']
 
@@ -98,20 +96,3 @@ def get_query_response(data: str, user_query: str):
         print(f"Error generating answer: {e}")
         raise RetryableException(f"Error generating answer: {e}")
 
-def llm(system_prompt: str, user_prompt: str):
-    # ensure your LLM imports are all within this function
-    from groq import Groq
-
-    # define your own LLM here
-    client = Groq(api_key=os.environ['GROQ_API_KEY'])
-    MODEL = 'llama3-70b-8192'
-
-    response = client.chat.completions.create(
-        model=MODEL,
-        temperature = 0,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-    )
-    return response.choices[0].message.content

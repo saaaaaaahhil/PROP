@@ -5,6 +5,7 @@ from starlette.concurrency import run_in_threadpool
 from fastapi import BackgroundTasks
 from routes.docs.store_operations import upload_document_to_index, delete_doc_data
 from routes.docs.search import run_rag_pipeline
+from routes.docs.store_images import upload_image
 
 router = APIRouter(prefix='/doc', tags=['DOC'])
 
@@ -25,6 +26,8 @@ async def upload_doc(
         contents = await file.read()
 
         background_tasks.add_task(upload_document_to_index, project_id, contents, file_name, file_type)
+        background_tasks.add_task(upload_image, contents, project_id)
+
         return {'success': True}
     except Exception as e:
         print(f'Error uploading file: {e}')
