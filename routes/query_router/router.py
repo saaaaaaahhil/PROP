@@ -46,7 +46,6 @@ async def run_user_query(
             'general' : run_rag_pipeline,
             'general_csv': run_query,
             'return_image': return_image_from_store,
-            'siteplan': query_images,
             'other': other_query
         }
 

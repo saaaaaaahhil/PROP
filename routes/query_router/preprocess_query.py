@@ -12,96 +12,16 @@ from strictjson import *
 RETRY_WAIT = wait_exponential(multiplier=int(Config.RETRY_MULTIPLIER), min=int(Config.RETRY_MIN), max=int(Config.RETRY_MAX))
 RETRY_ATTEMPTS = int(Config.RETRY_ATTEMPTS)
 
-
-system_prompt_multiquery = """Analyze the given query and classify it into one of the following categories: \
-  - 'metadata' if the query is related to location, connectivity (roads, metro/MRT) & social infrastructure near the project. \
+system_prompt_singlequery = """Classify each query into one of the following categories: \
+  - 'metadata' for queries about location, connectivity, and nearby social infrastructure. \
     Some example queries: \
     1. What are the nearby schools, hospitals, and shopping malls? \
     2. How far is the project from the nearest metro station? \
-    3. What are the nearby landmarks? \
-    4. What is the air quality index around property? \
-  - 'vision' if answering the query would require access to a floor plan or master plan or unit plan. \
+    3. What is the air quality index around property? \
+  - 'vision' for queries about floor plan, master plan or unit plan.
     Some example queries: \
-    1. Number of rooms \
-    2. Size of rooms \
-    3. Presence of specific rooms or spaces in a unit type - eg, does the 2 bed unit have balcony/study room/helper room/servant quarters/house shelter? \
-    4. Mapping unit type to blocks or towers within a project - eg, which blocks/tower have 2 bed + study unit? \
-    5. Area of a specific unit type - eg, what is the area of 2 Bed unit? \
-  - 'csv' if the query is associated with a specific unit number details.  \
-    Some example queries: \
-    1. What is the price of unit 123? \
-    2. What is the view of unit 123? Is it unsold? \
-  - 'csv' if the query is related to offers/discounts for customers or brokers/agents. \
-    Some example queries: \
-    1. Any ongoing offers for 3 beds? \
-    2. What is the brokerage offer/commission slab for this project/quarter? \
-    3. Any special commission/brokerage offers/kickers? \
-  -  'csv' if query is associated with price of units, down payment, emi. \
-    Some example queries\
-    1. What units might fit into monthly mortgage of $2000?\
-    2. Which units can be purchased with down payment of $200000?\
-    3. What are the options for 2-bedder units with monthly emi $3000 and a downpayment of $500000?\
-  - 'return_image' if the query is related to returning an image or a floor plan or a master plan. \
-    Some example queries: \
-    1. Can you show me the floor plan of the 2 bed unit? \
-    2. Can you show me the master plan? \
-    3. Can you show me the site map? \
-  - 'general' if query is related to rules and regulations, taxes and other standard operating procedures  \
-    Some example queries: \
-    1. What is the capital gains tax treatment for non-resident purchasers from Dubai? How are my rentals taxed?\
-    2. Broker A shared the lead of international customer Peter on 3rd Dec. Later broker B shared the same lead but with the customer in email loop on 10th Dec. Whom should the lead credit go to? (SOP's regarding sales)\
-  - 'docs' if the query is related to amenities, facilities, construction details, materials used, design specifics, or any other detailed documentation about the project. \
-    Some example queries: \
-    1. What are the amenities/facilities available in the project? \
-    2. What is the material used in the kitchen? \
-    3. What’s the ceiling height in the bathrooms? \
-    4. Are there any energy-efficient features in the building design? \
-  - 'other' if the query does not fall into either of the previous categories. \
-  If the input from user contains more than one query(i.e. composite query), that should be separated into individual queries, that are self-sufficient and include enough context to be understood independently, for classification. \
-  Respond with a list of JSON objects in the following format \
-  Example 1: How many units have price less than 2M, are unsold and have a pool view and which are the nearby schools to the property?  \
-  Output 1: 
-  {
-    'result': [
-      {
-        "query": "How many units have price less than 2M, are unsold and have a pool view?",
-        "category": "csv"
-      },
-      {
-        "query": "Which are the nearby schools to the property?",
-        "category": "metadata"
-      }
-    ]
-  }
-  Example 2: What is the price of unit 123? Is it unsold? \
-  Output 2:
-  {
-    'result': [
-      {
-        "query": "What is the price of unit 123?",
-        "category": "csv"
-      },
-      {
-        "query": "Is unit 123 unsold?",
-        "category": "csv"
-      }
-    ]
-  }
-  Do not provide any explanation or additional information in your response."""
-
-
-system_prompt_singlequery = """Analyze the given query and classify it into one of the following categories: \
-  - 'metadata' if the query is related to location, connectivity (roads, metro/MRT) & social infrastructure near the project. \
-    Some example queries: \
-    1. What are the nearby schools, hospitals, and shopping malls? \
-    2. How far is the project from the nearest metro station? \
-    3. What are the nearby landmarks? \
-    4. What is the air quality index around property? \
-  - 'vision' if answering the query would require access to a floor plan or master plan or unit plan.
-    Some example queries: \
-    1. Number of rooms \
-    2. Size of rooms \
-    3. Presence of specific rooms or spaces in a unit type - eg, does the 2 bed unit have balcony/study room/helper room/servant quarters/house shelter? \
+    1. How many rooms in 4 bed unit?
+    3. Does the 2 bed unit have balcony? \
     4. Mapping unit type to blocks or towers within a project - eg, which blocks/tower have 2 bed + study unit? \
     5. Area of a specific unit type - eg, what is the area of 2 Bed unit? \
   - 'csv' if the query is associated with a specific unit number.  \
@@ -113,18 +33,16 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
     1. Any ongoing offers for 3 beds? \
     2. What is the brokerage offer/commission slab for this project/quarter? \
     3. Any special commission/brokerage offers/kickers? \
-  -  'csv' if query is associated with price of units, down payment, emi. \
+  - 'csv' if query is associated with price of units, down payment, emi. \
     Some example queries\
     1. What units might fit into monthly mortgage of $2000?\
     2. Which units can be purchased with down payment of $200000?\
     3. What are the options for 2-bedder units with monthly emi $3000 and a downpayment of $500000?\
   - 'return_image' if the query is related to returning an image or a floor plan or a master plan. \
     Some example queries: \
-    1. What is the plan for 2 bed units?
     1. Show me the plan of the 2 bed unit? \
     2. Give me the master plan \
-    3. Can you show me the site map? \
-    - 'general' if the query is related to rules and regulations, taxes, standard operating     procedures, warranty, or defect liability period.
+  - 'general' if the query is related to rules and regulations, taxes, standard operating procedures, warranty, or defect liability period.
     Some example queries:
     1. What is the capital gains tax treatment for non-resident purchasers from Dubai? How are my rentals taxed?
     2. Broker A shared the lead of international customer Peter on 3rd Dec. Later broker B shared the same lead but with the customer in email loop on 10th Dec. Whom should the lead credit go to? (SOP's regarding sales)
@@ -135,12 +53,10 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
     2. What is the material used in the kitchen? \
     3. What's the ceiling height in the bathrooms? \
     4. Are there any energy-efficient features in the building design? \
-  - 'general_csv' if the query is regarding extracting detailed real estate market information and performing financial analysis to support investment decisions, market analysis, and property management.
-    Some example queries are:
-     1. What is the average price PSF (per square foot) of 2 beds in Grand duman project?
-     2. What is the approx. rental values for 3 beds at cashew heights condo located near myst project?
-     3. How many 1 beds have been sold at Continuum and what's the average transaction value?
-  - 'siteplan' if the query is concerned with the relative location of units or blocks within the project or requires the site plan to answer.
+  - 'docs' if the query is related to appliances within a unit. \
+    Some example queries: \
+    1. Does the 3 bed unit have a washer? \
+  - 'vision' if the query is concerned with the relative location of units or blocks within the project or requires the site plan to answer.
     Some example queries:
     1. Which block is closest to the entrance drop-off in the project?
     2. Which units have the best view of the central garden?
@@ -176,10 +92,6 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
       },
       {
         "query": "<query>",
-        "category": "siteplan"
-      },
-      {
-        "query": "<query>",
         "category": "other"
       }
     ]
@@ -188,7 +100,7 @@ system_prompt_singlequery = """Analyze the given query and classify it into one 
   Do not provide any explanation or additional information in your response."""
 
 system_prompt_breakdown = """
-Analyze the given query and break it down into granular, self-sufficient queries only when necessary for understanding or completeness. Each query should be independently understandable and include enough context. Combine closely related parts of the query if it makes sense for clarity and context. Only break down queries if it makes sense to do so. 
+Analyze the given query and break it down into granular, self-sufficient queries only when necessary for understanding or completeness. Each query should be independently understandable and include enough context. Combine closely related parts of the query if it makes sense for clarity and context. Only break down queries if it makes sense to do so. Ensure the breakdown maintains the context and clarity of the original query.
 
 For example:
 Composite Query: "What is the price of unit 208? Is it unsold?"
@@ -207,10 +119,16 @@ Composite Query: "Which blocks are 1 Bed + study units located in tembusu grand?
 Output: {"result": ["Which blocks have 1 Bed + study units in Tembusu Grand?"]}
 Thought process: This query is straightforward and specific, needing no further breakdown for clarity.
 
+Composite Query: "An international channel partner/broker has registered a customer lead by marking a mail to sales team member. Hope lead registration is valid for Sky eden."
+Output: {"result": ["Is the lead registration valid if an international channel partner/broker has registered a customer lead by marking a mail to a sales team member for Sky Eden?"]}
+Thought process: This query can be combined into a single coherent question for clarity.
+
 Respond with a list of JSON objects in the following format:
 {
   "result": [<granular_query1>, <granular_query2>, ...]
 }
+
+Note: Maintain the context and combine related parts if it improves clarity.
 """
 
 @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
