@@ -28,7 +28,7 @@ system_prompt_singlequery = """Classify each query into one of the following cat
     Some example queries: \
     1. What is the price of unit 123? \
     2. What is the view of unit 123? Is it unsold? \
-  - 'csv' if the query is related to offers/discounts for customers or brokers/agents. \
+  - 'docs' if the query is related to offers/discounts for customers or brokers/agents. \
     Some example queries: \
     1. Any ongoing offers for 3 beds? \
     2. What is the brokerage offer/commission slab for this project/quarter? \
