@@ -305,24 +305,25 @@ def aggregate_queries(queries: list):
     This function aggregates all the vision and doc queries.
     """
     aggregated_queries = []
-    doc_queries = []
+    # doc_queries = []
     vision_queries = []
 
     #Create separate list for each category
     for query in queries:
         if query['category'] == 'docs':
-            doc_queries.append(query['query'])
+            # doc_queries.append(query['query'])
+            aggregated_queries.append(query)
         elif query['category'] == 'vision':
             vision_queries.append(query['query'])
         else:
             aggregated_queries.append(query)
 
-    #Concatenate all doc queries
-    if len(doc_queries) != 0:
-        combined_doc_query = ""
-        for query in doc_queries:
-            combined_doc_query += query + ". "
-        aggregated_queries.append({'query': combined_doc_query, 'category': 'docs'})
+    # #Concatenate all doc queries
+    # if len(doc_queries) != 0:
+    #     combined_doc_query = ""
+    #     for query in doc_queries:
+    #         combined_doc_query += query + ". "
+    #     aggregated_queries.append({'query': combined_doc_query, 'category': 'docs'})
 
     #Concatenate all vision queries
     if len(vision_queries) != 0:
