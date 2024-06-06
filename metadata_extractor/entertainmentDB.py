@@ -18,9 +18,10 @@ def entertainmentDB(vicinity_map, src_lat, src_lng, radius):
         
         if distance is not None:
             # Append each entry to the temporary list with distance as a float value
+            distance_float = float(distance.replace(',', '').split()[0])
             entertainment_data.append({
                 "Name": name,
-                "distance_from_property": float(distance.split()[0]),
+                "distance_from_property": distance_float,
                 "Longitude": longitude
             })
 

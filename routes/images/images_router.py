@@ -37,12 +37,13 @@ async def upload_image(
 @router.post('/run_image_query')
 async def run_image_query(
     project_id: str = Form(...),
-    query: str = Form(...)):
+    query: str = Form(...),
+    user_id: str = Form(None)):
 
     try:
         print(f'Running query for project {project_id}...')
 
-        response = await run_in_threadpool(query_images, project_id, query)
+        response = await run_in_threadpool(query_images, project_id, query, user_id)
         if response["success"]:
             return JSONResponse(status_code=200, content={"message": f'Query ran successfully.', "result": response["answer"]})
         else:

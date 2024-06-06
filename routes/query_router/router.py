@@ -4,7 +4,8 @@ from fastapi.responses import JSONResponse
 import time
 from starlette.concurrency import run_in_threadpool
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from routes.query_router.preprocess_query import preprocess_query, aggregate_queries
+from routes.query_router.preprocess_query import aggregate_queries
+from routes.query_router.preprocess_query2 import preprocess_query
 from routes.mongo_db_functions import get_project_version
 from routes.csv.sql_agent import run_query
 from routes.metadata.run_md_query import run_md_query
@@ -13,7 +14,9 @@ from routes.images.image_agent import query_images
 from routes.images.return_image import return_image_from_store
 from routes.query_router.context_agent import get_context_aware_query
 # from connections.redis import llmcache
+from connections.mongo_db import debug_collection
 import os
+import json
 from routes.llm_connections import groq_client
 
 
@@ -30,12 +33,12 @@ async def run_user_query(
     try:
         if not(chat_id is None):
             #Get context aware query
-            context_query = await run_in_threadpool(get_context_aware_query, chat_id, project_id, query)
+            context_query = await run_in_threadpool(get_context_aware_query, chat_id, project_id, query, user_id)
         else:
             context_query = query
 
         #Get categories of queries through classifier
-        response = await run_in_threadpool(preprocess_query, context_query)
+        response = await run_in_threadpool(preprocess_query, context_query, user_id, project_id, chat_id)
 
         # Mapping of functions and category
         category_functions = {
@@ -51,24 +54,60 @@ async def run_user_query(
 
         if len(response) == 1:
             #Single query execution
-            ans = await run_in_threadpool(execute_single_query, response[0], category_functions, project_id)
+            ans = await run_in_threadpool(execute_single_query, response[0], category_functions, project_id, user_id)
             if ans['success']:
+                if os.environ.get('ENVIRONMENT') == 'DEVELOPER':
+                    debug_collection.insert_one(
+                        {
+                            'project_id': project_id,
+                            'user_id': user_id,
+                            'query': query,
+                            'response_type': 'success',
+                            'response': ans['answer'],
+                            'response_time': f'{round(time.time()-start_time,2)}',
+                            'classification' : str(response)
+                        }
+                    )
                 return JSONResponse(status_code=200, content={"message": f'Query {query} ran successfully on {project_id} database.', 'response_time': f'{round(time.time()-start_time,2)}s', 'result': ans['answer']})
             else:
+                if os.environ.get('ENVIRONMENT') == 'DEVELOPER':
+                    debug_collection.insert_one(
+                        {
+                            'project_id': project_id,
+                            'user_id': user_id,
+                            'query': query,
+                            'response_type': 'failure',
+                            'response': ans.get('failure', 'Failure not logged'),
+                            'response_time': f'{round(time.time()-start_time,2)}',
+                            'classification' : str(response)
+                        }
+                    )
                 return JSONResponse(status_code=500, content={"message": f'Error running query {query} on {project_id} database', 'response_time': f'{round(time.time()-start_time,2)}s'})
         else:
             #Multiple queries are executed parallely.
             aggregated_queries = aggregate_queries(response)
-            ans = await run_in_threadpool(execute_queries_parallel, category_functions, project_id, aggregated_queries)
+            ans = await run_in_threadpool(execute_queries_parallel, category_functions, project_id, aggregated_queries, user_id)
+            if os.environ.get('ENVIRONMENT') == 'DEVELOPER':
+                debug_collection.insert_one(
+                    {
+                        'project_id': project_id,
+                        'user_id': user_id,
+                        'query': query,
+                        'response_type': 'success',
+                        'response': ans,
+                        'response_time': f'{round(time.time()-start_time,2)}',
+                        'classification' : str(response)
+                    }
+                )
             return JSONResponse(status_code=200, content={"message": f'Query {query} ran successfully on {project_id} database.', 'response_time': f'{round(time.time()-start_time,2)}s', 'result': "\n".join(ans)})
             
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": f'Error running query {query} on {project_id} database: {e}', 'response_time': f'{round(time.time()-start_time,2)}s'})
     
-def other_query(project_id: str, query: str):
+def other_query(project_id: str, query: str, user_id: str):
     return {'success': True, 'answer': 'The query is out of scope for this project.'}
 
-def execute_single_query(response: dict, category_functions: dict, project_id: str):
+def execute_single_query(response: dict, category_functions: dict, project_id: str, user_id: str):
     try:
         category = response['category']
 
@@ -90,7 +129,7 @@ def execute_single_query(response: dict, category_functions: dict, project_id: s
             
         # Give query to LLM
         # print("No entry found in cache")
-        ans = category_functions[category](project_id, query)
+        ans = category_functions[category](project_id, query, user_id)
 
         if ans['success']:
             #Store response inside cache
@@ -102,7 +141,7 @@ def execute_single_query(response: dict, category_functions: dict, project_id: s
         print(f'Failed to execute query: {e}')
         return {'success': False}
     
-def execute_queries_parallel(category_functions: dict, project_id: str, response: list):
+def execute_queries_parallel(category_functions: dict, project_id: str, response: list, user_id: str):
     final_response = []
 
     with ThreadPoolExecutor() as executor:
@@ -117,11 +156,11 @@ def execute_queries_parallel(category_functions: dict, project_id: str, response
                     # final_response.append(check[0].get('response', ''))
                 # else:
                 if category == 'general':
-                    future = executor.submit(category_functions[category], 'general', query)
+                    future = executor.submit(category_functions[category], 'general', query, user_id)
                 elif category == 'general_csv':
-                    future = executor.submit(category_functions[category], 'market', query)
+                    future = executor.submit(category_functions[category], 'market', query, user_id)
                 else:
-                    future = executor.submit(category_functions[category], project_id, query)
+                    future = executor.submit(category_functions[category], project_id, query, user_id)
                     
                 futures.append((future, query, category))
 

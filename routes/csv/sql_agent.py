@@ -11,10 +11,11 @@ from urllib.parse import quote_plus
 import os
 from threading import Lock
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from routes.llm_connections import llm_openai
 from config import Config
 from routes.exceptions import RetryableException
 from routes.csv.connect_db import sanitize_project_id
+from portkey_ai import createHeaders, PORTKEY_GATEWAY_URL
+
 
 
 # Retry configuration
@@ -42,6 +43,20 @@ def get_agent_executor(project_id: str):
     sanitized_project_id = sanitize_project_id(project_id)
 
     try:
+        llm_openai = ChatOpenAI(
+            temperature=0.3, 
+            model="gpt-4o", 
+            base_url=PORTKEY_GATEWAY_URL,
+            default_headers=createHeaders(
+                provider="openai",
+                api_key=str(Config.PORTKEY_API_KEY),
+                metadata={
+                    'environment': os.environ['ENVIRONMENT'],
+                    'project_id': project_id
+                }
+            ))
+
+
         agent_lock = get_lock(sanitized_project_id)
         with agent_lock:
             if sanitized_project_id in agent_cache:
@@ -82,7 +97,7 @@ def get_agent_executor(project_id: str):
         return None
 
 # have optional agent type with default zero-shot-react-description
-def run_query(project_id: str, query: str):
+def run_query(project_id: str, query: str, user_id: str = None):
     """
     This function takes a query and runs it on the specified database.
     """

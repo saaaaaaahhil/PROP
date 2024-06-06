@@ -3,7 +3,7 @@ import json
 from config import Config
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from strictjson import *
-from routes.llm_connections import groq_client, groq_llm
+from routes.llm_connections import portkey_groq
 from routes.exceptions import RetryableException
 
 # Retry configuration
@@ -15,7 +15,7 @@ MODEL = 'llama3-70b-8192'
 # MODEL='gpt-4o'
 
 @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
-def get_query_category(user_query: str):
+def get_query_category(user_query: str, project_id: str, user_id: str):
     """
     This function takes a query and returns the category of query for eg. healthcare/landmark.
     """
@@ -34,7 +34,11 @@ def get_query_category(user_query: str):
                 "content": user_query 
             }
         ]
-        response = groq_client.chat.completions.create(
+        response = portkey_groq.with_options(metadata = {
+            "_user": user_id,
+            "environment": os.environ['ENVIRONMENT'],
+            "project_id": project_id
+        }).chat.completions.create(
             model=MODEL,
             messages=messages,
             temperature=0.5,
@@ -54,43 +58,46 @@ def get_query_category(user_query: str):
         raise RetryableException(f"Error predicting category: {e}")
 
 @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
-def get_query_response(data: str, user_query: str):
+def get_query_response(data: str, user_query: str, project_id: str, user_id: str):
     """
     This function takes a query and data to be inferred upon and returns the answer to user query.
     """
-    encoded_query =  user_query + "\n" + str(data)
     try:
+        messages = []
+        encoded_query =  user_query + "\n" + str(data)
         system_prompt = """
-        You are a Natural Language Processing API capable of answering user queries by analyzing the data provided to you. You should respond in JSON format with the following schema:
-        {
-            'answer': 'output in string format'
-        }
+        You are a Natural Language Processing API capable of answering user queries by analyzing the data provided to you.
 
         You need to identify what is required in the query and appropriately answer the query using the project data provided to you along with the query. The data provided to you belongs to a certain project, and from that, you can answer queries like what is the AQI around the property, how far is the project from certain landmarks, what are the nearest hospitals/schools, etc., from the property. If the answer is not found in the data, return 'No results found!' as the answer.
 
-        Format the 'answer' field using Markdown. Use the following guidelines:
+        While generating the response, use the following guidelines:
         - Use headings for important sections, indicated by `#` for the main heading.
         - Use subheadings, indicated by `##`, for secondary sections.
         - Use bullet points `-` for listing items.
         - Use bold text `**` for highlighting important information.
         - Use code blocks for any structured data or examples.
 
-        Example response format:
-
-        {
-            "answer": "# Key Information\\n\\n- **AQI:** 42\\n- **Nearest Hospital:** XYZ Hospital\\n- **Distance to Landmark:** 2.5 km\\n\\nNo results found!"
-        }
-
-        Ensure the 'answer' field in the JSON response is properly formatted in Markdown and the JSON response is valid. Do not include any extra escape characters or newline characters inside the JSON object.
+        Ensure the response is properly formatted in Markdown format.
         """
-        res = strict_json(system_prompt = system_prompt,
-                    user_prompt = encoded_query,
-                    output_format ={
-                                    "answer": "## Key Information\n- **AQI:** 42\n- **Nearest Hospital:** XYZ Hospital\n- **Distance to Landmark:** 2.5 km\n\n`No results found!`"},
-                    llm = groq_llm,
-                    chat_args={'temperature': 1, 'max_tokens':1024, 'top_p': 1})
         
-        return res['answer']
+        messages.append({'role': 'system', 'content': system_prompt})
+        messages.append({'role': 'user', 'content': encoded_query})
+
+        response = portkey_groq.with_options(metadata = {
+            "_user": user_id,
+            "environment": os.environ['ENVIRONMENT'],
+            "project_id": project_id
+        }).chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            temperature=0.5,
+            max_tokens=1024,
+            top_p=1,
+            stream=False,
+            stop=None
+        )
+        response_message = response.choices[0].message.content
+        return response_message
 
     except Exception as e:
         print(f"Error generating answer: {e}")

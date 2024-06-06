@@ -143,7 +143,7 @@ def get_chat_history(chat_id: str):
         object_id = ObjectId(chat_id)
         messages = []
         context_length = int(os.environ['MONGO_CONTEXT_LENGTH'])
-        message_history = chat_collection.find_one({'_id':object_id}, {"messages": {"$slice":context_length }})
+        message_history = chat_collection.find_one({'_id': object_id}, {"messages": {"$slice":context_length }})
         if message_history is not None:
             for message in message_history['messages']:
                 messages.append({'text': message['text'], 'role': message['role']})

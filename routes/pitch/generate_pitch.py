@@ -8,7 +8,7 @@ from routes.docs.search import run_rag_pipeline
 from routes.images.image_agent import query_images
 from routes.query_router.preprocess_query import aggregate_queries
 
-def other_query(project_id: str, query: str):
+def other_query(project_id: str, query: str, user_id: str = None):
     return {'success': True, 'answer': 'The query is out of scope for this project.'}
 
 async def generate_pitch(project_id: str, query:str):

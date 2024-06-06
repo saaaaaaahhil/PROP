@@ -1,6 +1,6 @@
 import base64
 import uuid
-from routes.llm_connections import openai_client
+from routes.llm_connections import portkey_openai
 import fitz
 import os
 from routes.images.store_operations import upload_image_to_store
@@ -32,7 +32,7 @@ def upload_image(contents, project_id: str):
             encoded_image = encode_image(f'temp/{image}.png')
             base64_image = encoded_image.get('encoded') # Get encoded image string
             image_content = encoded_image.get('content') # Get image content
-            image_name = get_image_name(base64_image)
+            image_name = get_image_name(base64_image, project_id)
             # If image is relevant then store it in database
             if image_name != 'invalid_image':    
                 update_mongo_file_status({'_id': image, 'project_id': project_id}, {"$set": {'file_name': image_name, 'file_type': 'png', 'file_size': f'{0} KB', "added_on": datetime.now().isoformat(), 'chunks': [], 'status': 'in_progress'}}, True)
@@ -44,7 +44,7 @@ def upload_image(contents, project_id: str):
 
         
 
-def get_image_name(base64_image):
+def get_image_name(base64_image, project_id: str):
     """
     This function retrieves the name of the image based on its context.
     """
@@ -72,7 +72,10 @@ def get_image_name(base64_image):
             ]
             }
         ]
-        response = openai_client.chat.completions.create(
+        response = portkey_openai.with_options(metadata = {
+            "environment": os.environ['ENVIRONMENT'],
+            "project_id": project_id
+        }).chat.completions.create(
                 model="gpt-4o",
                 messages=messages,
                 max_tokens=300,

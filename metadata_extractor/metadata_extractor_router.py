@@ -17,11 +17,12 @@ from starlette.concurrency import run_in_threadpool
 router = APIRouter(prefix='/metadata', tags=['LOCATION_METADATA'])
 
 @router.post('/extract_metadata')
-async def extract_metadata(address : str, radius : int, project_id : str):
+async def extract_metadata(address : str, radius : str, project_id : str):
     """
     This function extracts the location metadata and stores it in database.
     """
     start_time = time.time()
+    radius = int(radius)
     try:
         print(f"Coordinate Extraction started for input : {address} and radius: {radius}")
         src_lat, src_lng = extract_latitude_longitude(address=address)

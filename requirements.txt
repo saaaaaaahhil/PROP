@@ -25,3 +25,4 @@ pymongo
 python-docx
 strictjson
 pymupdf
+portkey-ai

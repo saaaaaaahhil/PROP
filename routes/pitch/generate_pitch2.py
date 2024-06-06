@@ -13,7 +13,7 @@ def get_persona_from_query(query: str):
     """
     persona_system_prompt = """Identify the persona of the user based on the query provided by the user.Possible personas include: single_person, couple, couple_with_children, general, multi-generational_family_couple_with_parents_and_children, elderly_couple, differently_abled. Respond with JSON like : 
         {
-            "persona" : "couple"
+            'persona' : 'couple' | 'single_person' |  'couple_with_children'
         }
     """
     res = strict_json(system_prompt = persona_system_prompt,
