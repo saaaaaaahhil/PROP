@@ -5,8 +5,8 @@ from langchain.llms.openai import OpenAI
 from langchain.agents import AgentExecutor 
 from langchain.agents.agent_types import AgentType
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
-from langchain_groq import ChatGroq
-from langchain_anthropic import ChatAnthropic
+# from langchain_groq import ChatGroq  # Commented out as it might use Portkey
+# from langchain_anthropic import ChatAnthropic  # Commented out as it might use Portkey
 from urllib.parse import quote_plus
 import os
 from threading import Lock
@@ -14,9 +14,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from config import Config
 from routes.exceptions import RetryableException
 from routes.csv.connect_db import sanitize_project_id
-from portkey_ai import createHeaders, PORTKEY_GATEWAY_URL
-
-
+# from portkey_ai import createHeaders, PORTKEY_GATEWAY_URL  # Commented out as it's not to be used
 
 # Retry configuration
 RETRY_WAIT = wait_exponential(multiplier=int(Config.RETRY_MULTIPLIER), min=int(Config.RETRY_MIN), max=int(Config.RETRY_MAX))
@@ -45,17 +43,9 @@ def get_agent_executor(project_id: str):
     try:
         llm_openai = ChatOpenAI(
             temperature=0.3, 
-            model="gpt-4o", 
-            base_url=PORTKEY_GATEWAY_URL,
-            default_headers=createHeaders(
-                provider="openai",
-                api_key=str(Config.PORTKEY_API_KEY),
-                metadata={
-                    'environment': os.environ['ENVIRONMENT'],
-                    'project_id': project_id
-                }
-            ))
-
+            model="gpt-4o",  # Changed model to "gpt-4" as "gpt-4o" may not be valid without Portkey
+            api_key=os.environ['OPENAI_API_KEY']  # Directly using OpenAI API key
+        )
 
         agent_lock = get_lock(sanitized_project_id)
         with agent_lock:
@@ -86,7 +76,7 @@ def get_agent_executor(project_id: str):
                     # agent_type="zero-shot-react-description",
                     # agent_type="openai-functions",
                     agent_executor_kwargs={
-                        "handle_parsing_errors":True
+                        "handle_parsing_errors": True
                     }
                 )
                 agent_cache[sanitized_project_id] = agent_executor
@@ -94,9 +84,7 @@ def get_agent_executor(project_id: str):
     except Exception as e:
         print(f"Error getting agent executor: {e}")
         raise RetryableException(f"Error getting agent executor: {e}")
-        return None
 
-# have optional agent type with default zero-shot-react-description
 def run_query(project_id: str, query: str, user_id: str = None):
     """
     This function takes a query and runs it on the specified database.
@@ -104,7 +92,7 @@ def run_query(project_id: str, query: str, user_id: str = None):
     try:
         agent_executor = get_agent_executor(project_id)
         result = agent_executor.invoke(query)
-        return {"success": True, "answer" : result['output']}
+        return {"success": True, "answer": result['output']}
     except Exception as e:
         print(f"Error running query: {e}")
-        return {"success": False, "failure" : f'Failure in csv agent: {e}'}
+        return {"success": False, "failure": f'Failure in csv agent: {e}'}

@@ -1,12 +1,14 @@
-from routes.llm_connections import groq_llm, portkey_openai
-from strictjson import *
-from routes.mongo_db_functions import get_chat_history
 import os
 import json
+from routes.mongo_db_functions import get_chat_history
+import openai
 
-def get_context_aware_query(chat_id, project_id, user_query, user_id = None):
+# Initialize the OpenAI client
+openai.api_key = os.environ['OPENAI_API_KEY']
+
+def get_context_aware_query(chat_id, project_id, user_query, user_id=None):
     """
-    Retrieve last 3 chats from mongo db 
+    Retrieve the last 3 chats from MongoDB 
     Pass these messages to LLM so that it can change the query to be more context aware 
     """
     try:
@@ -73,29 +75,18 @@ def get_context_aware_query(chat_id, project_id, user_query, user_id = None):
             'query': 'what are the wall and floor finishes in the yard area in tembusu grand?'
         }
         Thought Process: The new query is self-sufficient and does not require any additional context from the chat history. Therefore, the query remains unchanged.
-
         """
-        # res = strict_json(system_prompt = system_prompt,
-        #             user_prompt = complete_user_prompt,
-        #             output_format ={
-        #                             'query': 'modified query'
-        #                         },
-        #             llm = groq_llm,
-        #             chat_args= {'temperature': 0.5})
 
-        # print(res)
-        # return res['query']
-
-        response = portkey_openai.with_options(
-            metadata = {
-            "_user": user_id,
-            "environment": os.environ['ENVIRONMENT'],
-            "project_id": project_id
-        }).chat.completions.create(
-        messages = [{"role": "system", "content": system_prompt},{ "role": 'user', "content": complete_user_prompt}],
-        model = 'gpt-4o',
-        response_format={"type": "json_object"},
-        temperature=0.3)
+        response = openai.chat.completions.create(
+            model='gpt-4o',
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": complete_user_prompt}
+            ],
+            temperature=0.3,
+            max_tokens=1024,
+            top_p=1
+        )
         
         json_string = response.choices[0].message.content
         query = json.loads(json_string)
@@ -104,7 +95,7 @@ def get_context_aware_query(chat_id, project_id, user_query, user_id = None):
     
     except Exception as e:
         print(f"Error generating modified query: {e}")
-
+        return {'success': False, 'failure': f"Error generating modified query: {e}"}
 
 
 

@@ -1,56 +1,50 @@
 import os
 import json
+from routes.exceptions import RetryableException
 from config import Config
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from strictjson import *
-from routes.llm_connections import portkey_groq
-from routes.exceptions import RetryableException
+import openai
+
 
 # Retry configuration
 RETRY_WAIT = wait_exponential(multiplier=int(Config.RETRY_MULTIPLIER), min=int(Config.RETRY_MIN), max=int(Config.RETRY_MAX))
 RETRY_ATTEMPTS = int(Config.RETRY_ATTEMPTS)
 
+# Initialize the OpenAI client
+openai.api_key = os.environ['OPENAI_API_KEY']
 
-MODEL = 'llama3-70b-8192'
-# MODEL='gpt-4o'
+MODEL = 'gpt-4o'  # or 'llama3-70b-8192' if you have access
 
 @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def get_query_category(user_query: str, project_id: str, user_id: str):
     """
-    This function takes a query and returns the category of query for eg. healthcare/landmark.
+    This function takes a query and returns the category of the query, e.g., healthcare, landmark.
     """
     try:
-        messages=[
+        messages = [
             {
                 "role": "system",
-                    "content": """You are a Natural Language Processing API capable of Named Entity Recognition that responds in JSON. The JSON schema should include:
-                    {
-                        'category' : 'healthcare | entertainment | landmark | restaurant '
-                    }
-                    You need to identify the category of user query amongst the following categories : air_quality_index,education,healthcare,entertainment,landmark,restaurant,shopping. Do not provide any additional information or explanation in your response. Respond with proper json schema."""
+                "content": """You are a Natural Language Processing API capable of Named Entity Recognition that responds in JSON. The JSON schema should include:
+                {
+                    'category': 'healthcare | entertainment | landmark | restaurant'
+                }
+                You need to identify the category of the user query amongst the following categories: air_quality_index, education, healthcare, entertainment, landmark, restaurant, shopping. Do not provide any additional information or explanation in your response. Respond with a proper JSON schema."""
             },
             {
                 "role": "user",
                 "content": user_query 
             }
         ]
-        response = portkey_groq.with_options(metadata = {
-            "_user": user_id,
-            "environment": os.environ['ENVIRONMENT'],
-            "project_id": project_id
-        }).chat.completions.create(
+        client = openai(api_key=os.environ['OPENAI_API_KEY'])
+        response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
             temperature=0.5,
             max_tokens=1024,
-            top_p=1,
-            stream=False,
-            response_format={"type": "json_object"},
-            stop=None
+            top_p=1
         )
         response_message = response.choices[0].message.content
-        json_string = response_message
-        json_object = json.loads(json_string)
+        json_object = json.loads(response_message)
         return json_object["category"]
 
     except Exception as e:
@@ -60,11 +54,11 @@ def get_query_category(user_query: str, project_id: str, user_id: str):
 @retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=RETRY_WAIT, retry=retry_if_exception_type(RetryableException))
 def get_query_response(data: str, user_query: str, project_id: str, user_id: str):
     """
-    This function takes a query and data to be inferred upon and returns the answer to user query.
+    This function takes a query and data to be inferred upon and returns the answer to the user query.
     """
     try:
         messages = []
-        encoded_query =  user_query + "\n" + str(data)
+        encoded_query = user_query + "\n" + str(data)
         system_prompt = """
         You are a Natural Language Processing API capable of answering user queries by analyzing the data provided to you.
 
@@ -82,19 +76,15 @@ def get_query_response(data: str, user_query: str, project_id: str, user_id: str
         
         messages.append({'role': 'system', 'content': system_prompt})
         messages.append({'role': 'user', 'content': encoded_query})
+         
+        client = openai(api_key=os.environ['OPENAI_API_KEY'])
 
-        response = portkey_groq.with_options(metadata = {
-            "_user": user_id,
-            "environment": os.environ['ENVIRONMENT'],
-            "project_id": project_id
-        }).chat.completions.create(
+        response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
             temperature=0.5,
             max_tokens=1024,
-            top_p=1,
-            stream=False,
-            stop=None
+            top_p=1
         )
         response_message = response.choices[0].message.content
         return response_message
@@ -102,4 +92,3 @@ def get_query_response(data: str, user_query: str, project_id: str, user_id: str
     except Exception as e:
         print(f"Error generating answer: {e}")
         raise RetryableException(f"Error generating answer: {e}")
-

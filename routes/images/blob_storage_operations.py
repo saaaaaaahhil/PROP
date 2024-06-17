@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from connections.azure_blob_storage import blob_service_client
 from config import Config
 import re

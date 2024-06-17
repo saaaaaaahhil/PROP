@@ -108,7 +108,7 @@ def generate_queries_from_pitch(user_query: str):
             max_tokens=4096,   
             response_format={"type": "json_object"},
         )
-        response_message = response.choices[0].message.content
+        response_message = response['choices'][0]['message']['content']
         json_string = response_message
         json_object = json.loads(json_string)
         return json_object["result"]
@@ -157,7 +157,6 @@ def summarize_to_generate_pitch(query: str, data: str):
             messages=messages,
             max_tokens=4096,
             temperature=1,   
-            response_format={"type": "json_object"},
         )
         response_message = response.choices[0].message.content
         json_string = response_message

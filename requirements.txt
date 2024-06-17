@@ -12,7 +12,6 @@ sqlalchemy
 asyncpg
 greenlet
 openpyxl
-psycopg2
 azure-search-documents
 azure-identity
 numpy
@@ -26,3 +25,4 @@ python-docx
 strictjson
 pymupdf
 portkey-ai
+psycopg2-binary

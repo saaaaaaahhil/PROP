@@ -1,15 +1,15 @@
 from azure.search.documents.models import VectorizedQuery
-from langchain_groq import ChatGroq
-from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
+# from langchain_groq import ChatGroq  # Commented out as it might use Portkey
+# from langchain_anthropic import ChatAnthropic  # Commented out as it might use Portkey
 from langchain_core.prompts import ChatPromptTemplate
-from portkey_ai import createHeaders, PORTKEY_GATEWAY_URL
+# from portkey_ai import createHeaders, PORTKEY_GATEWAY_URL  # Commented out as it's not to be used
 import numpy as np
 import os
 from config import Config
 from routes.docs.embeddings import get_embeddings
 from routes.docs.index_search_client import get_index_client
-import anthropic
+# import anthropic  # Commented out as it's not to be used
 
 system_prompt = """You are a real estate agent. Given the context (which is your knowledge) and the user query, provide the answer in as much detail as possible. While answering the queries:
 1. Do not assume any information and strictly adhere to the context provided.
@@ -19,7 +19,7 @@ Context: {context}"""
 
 def get_top_k_results(project_id, query):
     """
-    This function takes a query and returns the top k results from the rag pipeline.
+    This function takes a query and returns the top k results from the RAG pipeline.
     """
     try:
         embeddings = get_embeddings()
@@ -61,26 +61,13 @@ def generate_response(results, query, project_id, user_id):
     This function generates a response from the RAG pipeline results.
     """
     llm = ChatOpenAI(
-            # api_key=os.environ['ANTHROPIC_API_KEY'],
             api_key=os.environ['OPENAI_API_KEY'],
             temperature=0.3, 
-            # model="claude-3-sonnet-20240229",
-            model="gpt-4o", 
-            base_url=PORTKEY_GATEWAY_URL,
-            max_tokens=4096,
-            default_headers=createHeaders(
-                # provider="anthropic",
-                provider="openai",
-                api_key=str(Config.PORTKEY_API_KEY),
-                metadata={
-                    '_user': user_id,
-                    'environment': os.environ['ENVIRONMENT'],
-                    'project_id': project_id
-                }
-            ))
-    context = ""
-    for result in results:
-        context += f"{result}\n"
+            model="gpt-4o",  # Changed model to "gpt-4" as "gpt-4o" may not be valid without Portkey
+            max_tokens=4096
+    )
+
+    context = "\n".join(results)
 
     print(context)
     prompt = ChatPromptTemplate.from_messages([("system", system_prompt), ("human", query)])
